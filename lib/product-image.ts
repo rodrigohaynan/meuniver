@@ -303,6 +303,101 @@ function extractCanonicalPageUrl(html: string, pageUrl: URL) {
   return null;
 }
 
+
+function looksInstitutionalImage(url: URL) {
+  const value = decodeURIComponent(`${url.hostname}${url.pathname}${url.search}`).toLowerCase();
+  return (
+    value.includes("frontend-assets") ||
+    value.includes("logo") ||
+    value.includes("icon") ||
+    value.includes("placeholder") ||
+    value.includes("handshake") ||
+    value.includes("social") ||
+    value.includes("default") ||
+    value.includes("brand")
+  );
+}
+
+function isLikelyOpenGraphProductImage(url: URL, pageUrl: URL) {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (looksInstitutionalImage(url)) return false;
+
+  const pageHost = pageUrl.hostname.toLowerCase();
+  const imageHost = url.hostname.toLowerCase();
+  const isMercadoLivre =
+    pageHost === "mercadolivre.com.br" ||
+    pageHost.endsWith(".mercadolivre.com.br") ||
+    pageHost === "meli.la" ||
+    pageHost.endsWith(".meli.la");
+
+  if (isMercadoLivre) {
+    return imageHost.endsWith("mlstatic.com") && /\/D_NQ_/i.test(url.pathname);
+  }
+
+  return true;
+}
+
+function extractOpenGraphProductImage(html: string, pageUrl: URL) {
+  const values = new Map<string, string>();
+
+  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    const key = (tagAttribute(tag, "property") || tagAttribute(tag, "name")).toLowerCase();
+    const content = tagAttribute(tag, "content");
+    if (key && content && !values.has(key)) values.set(key, content);
+  }
+
+  for (const key of [
+    "og:image:secure_url",
+    "og:image:url",
+    "og:image",
+    "twitter:image:src",
+    "twitter:image",
+  ]) {
+    const candidate = values.get(key);
+    if (!candidate) continue;
+    try {
+      const resolved = new URL(htmlDecode(candidate), pageUrl);
+      if (isLikelyOpenGraphProductImage(resolved, pageUrl)) return resolved;
+    } catch {
+      // Continua procurando a próxima imagem social.
+    }
+  }
+
+  return null;
+}
+
+async function downloadProductImage(imageUrl: URL, referer: string): Promise<CapturedProductImage> {
+  const image = await fetchPublic(
+    imageUrl,
+    {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        referer,
+      },
+    },
+    IMAGE_TIMEOUT_MS,
+  );
+
+  if (!image.response.ok) {
+    await image.response.body?.cancel().catch(() => undefined);
+    throw new Error(`A imagem principal do anúncio respondeu com erro (${image.response.status}).`);
+  }
+
+  const imageBytes = await readLimited(image.response, MAX_IMAGE_BYTES);
+  const contentType = detectedImageType(imageBytes, image.response.headers.get("content-type") ?? "");
+  if (!contentType) throw new Error("O arquivo encontrado no anúncio não é uma imagem válida.");
+
+  const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
+  new Uint8Array(imageBuffer).set(imageBytes);
+
+  return {
+    blob: new Blob([imageBuffer], { type: contentType }),
+    sourceUrl: image.finalUrl.toString(),
+  };
+}
+
 function extractProductImage(html: string, pageUrl: URL) {
   const metaCandidates = new Map<string, string>();
   const rawCandidates: string[] = [];
@@ -589,37 +684,21 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
     }
   }
 
-  const imageUrl = extractProductImage(html, imagePageUrl);
-
-  const image = await fetchPublic(
-    imageUrl,
-    {
-      method: "GET",
-      headers: {
-        "user-agent": USER_AGENT,
-        accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        referer: imagePageUrl.toString(),
-      },
-    },
-    IMAGE_TIMEOUT_MS,
-  );
-
-  if (!image.response.ok) {
-    await image.response.body?.cancel().catch(() => undefined);
-    throw new Error("A imagem principal do anúncio não pôde ser baixada.");
+  // Primeira opção: OG Image/Twitter Image, desde que pareça realmente uma
+  // foto de produto. No Mercado Livre, imagens institucionais são rejeitadas
+  // e somente assets D_NQ_ da CDN mlstatic são aceitos nessa etapa.
+  const openGraphImage = extractOpenGraphProductImage(html, imagePageUrl);
+  if (openGraphImage) {
+    try {
+      return await downloadProductImage(openGraphImage, imagePageUrl.toString());
+    } catch {
+      // Se a OG Image existir mas estiver bloqueada/indisponível, continua
+      // para as imagens reais embutidas/JSON-LD abaixo.
+    }
   }
 
-  const imageBytes = await readLimited(image.response, MAX_IMAGE_BYTES);
-  const contentType = detectedImageType(imageBytes, image.response.headers.get("content-type") ?? "");
-  if (!contentType) throw new Error("O arquivo encontrado no anúncio não é uma imagem válida.");
-
-  const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
-  new Uint8Array(imageBuffer).set(imageBytes);
-
-  return {
-    blob: new Blob([imageBuffer], { type: contentType }),
-    sourceUrl: image.finalUrl.toString(),
-  };
+  const fallbackImage = extractProductImage(html, imagePageUrl);
+  return downloadProductImage(fallbackImage, imagePageUrl.toString());
 }
 
 async function captureProductImageViaMicrolink(rawUrl: string): Promise<CapturedProductImage> {
@@ -675,6 +754,10 @@ async function captureProductImageViaMicrolink(rawUrl: string): Promise<Captured
     imageUrl = new URL(imageAddress, productUrl);
   } catch {
     throw new Error("A imagem encontrada no anúncio possui um endereço inválido.");
+  }
+
+  if (!isLikelyOpenGraphProductImage(imageUrl, productUrl)) {
+    throw new Error("O serviço alternativo retornou uma imagem institucional, não a foto do produto.");
   }
 
   const image = await fetchPublic(
