@@ -227,15 +227,108 @@ function firstImageFromJsonLd(value: unknown): string | null {
   return null;
 }
 
+
+function marketplaceImageScore(url: URL) {
+  const host = url.hostname.toLowerCase();
+  const path = decodeURIComponent(url.pathname).toLowerCase();
+  let score = 0;
+
+  if (host.endsWith("mlstatic.com")) score += 30;
+  if (/\/d_nq_np/i.test(url.pathname)) score += 90;
+  else if (/\/d_nq_/i.test(url.pathname)) score += 60;
+  if (/_2x_/i.test(url.pathname)) score += 20;
+
+  if (
+    path.includes("frontend-assets") ||
+    path.includes("logo") ||
+    path.includes("icon") ||
+    path.includes("placeholder") ||
+    path.includes("handshake") ||
+    path.includes("social")
+  ) {
+    score -= 200;
+  }
+
+  return score;
+}
+
+function embeddedMercadoLivreImages(html: string) {
+  const normalized = html
+    .replace(/\\u002f/gi, "/")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;/gi, "&");
+
+  const matches =
+    normalized.match(
+      /https?:\/\/[a-z0-9.-]*mlstatic\.com\/D_NQ_[^"'\\\s<>]+?\.(?:webp|jpe?g|png|avif)/gi,
+    ) ?? [];
+
+  return [...new Set(matches)];
+}
+
+function extractCanonicalPageUrl(html: string, pageUrl: URL) {
+  const candidates: string[] = [];
+
+  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
+    const rel = tagAttribute(tag, "rel")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    const href = tagAttribute(tag, "href");
+    if (rel.includes("canonical") && href) candidates.push(href);
+  }
+
+  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    const key = (tagAttribute(tag, "property") || tagAttribute(tag, "name")).toLowerCase();
+    const content = tagAttribute(tag, "content");
+    if (key === "og:url" && content) candidates.push(content);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const resolved = new URL(htmlDecode(candidate), pageUrl);
+      const host = resolved.hostname.toLowerCase();
+      if (
+        (host === "mercadolivre.com.br" || host.endsWith(".mercadolivre.com.br")) &&
+        resolved.protocol === "https:"
+      ) {
+        resolved.hash = "";
+        return resolved;
+      }
+    } catch {
+      // Continua procurando outra URL canônica.
+    }
+  }
+
+  return null;
+}
+
 function extractProductImage(html: string, pageUrl: URL) {
-  const priorities = [
-    "og:image:secure_url",
-    "og:image:url",
-    "og:image",
-    "twitter:image:src",
-    "twitter:image",
-  ];
   const metaCandidates = new Map<string, string>();
+  const rawCandidates: string[] = [];
+
+  // Mercado Livre frequentemente coloca a foto real no JSON/hidratação da
+  // página enquanto o og:image pode ser apenas uma imagem institucional.
+  // Por isso as imagens D_NQ_ da CDN têm prioridade máxima.
+  rawCandidates.push(...embeddedMercadoLivreImages(html));
+
+  for (const script of html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? []) {
+    const jsonText = script.replace(/^<script\b[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
+    try {
+      const found = firstImageFromJsonLd(JSON.parse(jsonText));
+      if (found) rawCandidates.push(found);
+    } catch {
+      // Alguns sites entregam JSON-LD parcialmente inválido.
+    }
+  }
+
+  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
+    const rel = tagAttribute(tag, "rel").toLowerCase();
+    const href = tagAttribute(tag, "href");
+    if ((rel === "image_src" || rel.split(/\s+/).includes("image_src")) && href) {
+      rawCandidates.push(href);
+    }
+  }
 
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
     const key = (
@@ -247,38 +340,43 @@ function extractProductImage(html: string, pageUrl: URL) {
     if (key && content && !metaCandidates.has(key)) metaCandidates.set(key, content);
   }
 
-  const rawCandidates: string[] = [];
-  for (const key of priorities) {
+  for (const key of [
+    "og:image:secure_url",
+    "og:image:url",
+    "og:image",
+    "twitter:image:src",
+    "twitter:image",
+  ]) {
     const value = metaCandidates.get(key);
     if (value) rawCandidates.push(value);
   }
 
-  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
-    const rel = tagAttribute(tag, "rel").toLowerCase();
-    const href = tagAttribute(tag, "href");
-    if ((rel === "image_src" || rel.split(/\s+/).includes("image_src")) && href) rawCandidates.push(href);
-  }
+  const resolvedCandidates: Array<{ url: URL; score: number; order: number }> = [];
+  const seen = new Set<string>();
 
-  for (const script of html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? []) {
-    const jsonText = script.replace(/^<script\b[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
-    try {
-      const found = firstImageFromJsonLd(JSON.parse(jsonText));
-      if (found) rawCandidates.push(found);
-    } catch {
-      // Alguns sites entregam JSON-LD parcialmente inválido. As tags Open Graph acima continuam sendo usadas.
-    }
-  }
-
-  for (const candidate of rawCandidates) {
+  rawCandidates.forEach((candidate, order) => {
     try {
       const resolved = new URL(htmlDecode(candidate), pageUrl);
-      if (resolved.protocol === "http:" || resolved.protocol === "https:") return resolved;
+      if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return;
+      const key = resolved.toString();
+      if (seen.has(key)) return;
+      seen.add(key);
+      resolvedCandidates.push({
+        url: resolved,
+        score: marketplaceImageScore(resolved),
+        order,
+      });
     } catch {
-      // Continua procurando outra imagem candidata.
+      // Ignora candidatos inválidos.
     }
+  });
+
+  if (!resolvedCandidates.length) {
+    throw new Error("O anúncio não informou uma imagem principal que pudesse ser capturada.");
   }
 
-  throw new Error("O anúncio não informou uma imagem principal que pudesse ser capturada.");
+  resolvedCandidates.sort((a, b) => b.score - a.score || a.order - b.order);
+  return resolvedCandidates[0].url;
 }
 
 function detectedImageType(bytes: Uint8Array, headerType: string) {
@@ -435,8 +533,63 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
   }
 
   const htmlBytes = await readLimited(page.response, MAX_HTML_BYTES);
-  const html = new TextDecoder("utf-8").decode(htmlBytes);
-  const imageUrl = extractProductImage(html, page.finalUrl);
+  let html = new TextDecoder("utf-8").decode(htmlBytes);
+  let imagePageUrl = page.finalUrl;
+
+  const currentHost = page.finalUrl.hostname.toLowerCase();
+  const isMercadoLivre =
+    currentHost === "mercadolivre.com.br" ||
+    currentHost.endsWith(".mercadolivre.com.br");
+
+  if (isMercadoLivre) {
+    const canonicalPage = extractCanonicalPageUrl(html, page.finalUrl);
+    if (canonicalPage) {
+      const currentComparable = new URL(page.finalUrl);
+      currentComparable.hash = "";
+      const canonicalComparable = new URL(canonicalPage);
+      canonicalComparable.hash = "";
+
+      if (canonicalComparable.toString() !== currentComparable.toString()) {
+        try {
+          const canonicalResponse = await fetchPublic(
+            canonicalComparable,
+            {
+              method: "GET",
+              headers: {
+                "user-agent": USER_AGENT,
+                accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+                "accept-language": "pt-BR,pt;q=0.9,en;q=0.7",
+              },
+            },
+            PAGE_TIMEOUT_MS,
+          );
+
+          if (canonicalResponse.response.ok) {
+            const canonicalType =
+              canonicalResponse.response.headers.get("content-type")?.toLowerCase() ?? "";
+            if (
+              !canonicalType ||
+              canonicalType.includes("text/html") ||
+              canonicalType.includes("application/xhtml+xml")
+            ) {
+              html = new TextDecoder("utf-8").decode(
+                await readLimited(canonicalResponse.response, MAX_HTML_BYTES),
+              );
+              imagePageUrl = canonicalResponse.finalUrl;
+            } else {
+              await canonicalResponse.response.body?.cancel().catch(() => undefined);
+            }
+          } else {
+            await canonicalResponse.response.body?.cancel().catch(() => undefined);
+          }
+        } catch {
+          // Se a URL canônica não puder ser lida, usa o HTML original.
+        }
+      }
+    }
+  }
+
+  const imageUrl = extractProductImage(html, imagePageUrl);
 
   const image = await fetchPublic(
     imageUrl,
@@ -445,7 +598,7 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
       headers: {
         "user-agent": USER_AGENT,
         accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        referer: page.finalUrl.toString(),
+        referer: imagePageUrl.toString(),
       },
     },
     IMAGE_TIMEOUT_MS,
@@ -563,21 +716,25 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
     // A função direta devolverá a mensagem padronizada de link inválido.
   }
 
-  const canonicalCandidate = originalUrl ? mercadoLivreCanonicalCandidate(originalUrl) : null;
-  if (canonicalCandidate) {
-    try {
-      return await captureProductImageDirect(canonicalCandidate.toString());
-    } catch {
-      // Links longos do Mercado Livre nem sempre aceitam a URL reconstruída.
-      // Nesse caso continuamos com o link original e os fallbacks já existentes.
-    }
-  }
-
+  // Primeiro sempre abre o endereço real informado pelo usuário. Em páginas
+  // /up/ do Mercado Livre isso permite ler canonical/og:url e as imagens D_NQ_
+  // embutidas no HTML, exatamente o que se perde ao fabricar uma URL antes.
   try {
     return await captureProductImageDirect(rawUrl);
   } catch (directError) {
+    const canonicalCandidate = originalUrl ? mercadoLivreCanonicalCandidate(originalUrl) : null;
+
+    // A URL reconstruída pelo MLB fica apenas como fallback adicional.
+    if (canonicalCandidate) {
+      try {
+        return await captureProductImageDirect(canonicalCandidate.toString());
+      } catch {
+        // Continua para o fallback de metadados.
+      }
+    }
+
     try {
-      return await captureProductImageViaMicrolink(canonicalCandidate?.toString() ?? rawUrl);
+      return await captureProductImageViaMicrolink(rawUrl);
     } catch {
       throw directError instanceof Error
         ? directError
