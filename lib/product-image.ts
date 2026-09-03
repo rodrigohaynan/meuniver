@@ -407,6 +407,153 @@ async function downloadProductImage(
   };
 }
 
+
+function isMercadoLivreUrl(url: URL) {
+  const host = url.hostname.toLowerCase();
+  return (
+    host === "mercadolivre.com.br" ||
+    host.endsWith(".mercadolivre.com.br") ||
+    host === "meli.la" ||
+    host.endsWith(".meli.la")
+  );
+}
+
+function compactMercadoLivreItemId(url: URL) {
+  const candidates = [
+    url.searchParams.get("wid") ?? "",
+    url.searchParams.get("item_id") ?? "",
+    ...url.searchParams.getAll("pdp_filters"),
+    decodeURIComponent(url.hash.slice(1)),
+    url.pathname,
+  ];
+
+  for (const candidate of candidates) {
+    const match = candidate.match(/\bMLB[-_:]?(\d{6,})\b/i);
+    if (match) return `MLB${match[1]}`;
+  }
+
+  return "";
+}
+
+function decodeMercadoLivrePayload(value: string) {
+  return htmlDecode(value)
+    .replace(/\\u002f/gi, "/")
+    .replace(/\\u003a/gi, ":")
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u003d/gi, "=")
+    .replace(/\\u002d/gi, "-")
+    .replace(/\\\//g, "/")
+    .replace(/\\"/g, '"');
+}
+
+function lastJsonStringBefore(text: string, key: string, index: number, lookback = 60_000) {
+  const start = Math.max(0, index - lookback);
+  const before = text.slice(start, index);
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`"${escapedKey}"\\s*:\\s*"([^"]+)"`, "gi");
+  let value = "";
+  for (const match of before.matchAll(pattern)) {
+    value = match[1] ?? value;
+  }
+  return decodeMercadoLivrePayload(value);
+}
+
+function buildMercadoLivrePolycardImageUrl(
+  template: string,
+  pictureId: string,
+  square = "Q",
+  size = "V",
+) {
+  const safePictureId = pictureId.trim();
+  if (!/^[A-Z0-9_-]+-[A-Z]{3}\d+_\d{6}$/i.test(safePictureId)) return null;
+
+  const safeSquare = square.replace(/[^A-Z0-9]/gi, "") || "Q";
+  const safeSize = size.replace(/[^A-Z0-9]/gi, "") || "V";
+
+  const templates = [
+    template,
+    "https://http2.mlstatic.com/D_{square}_NP{2x}_{id}-{size}{sanitized_title}.webp",
+  ].filter(Boolean);
+
+  for (const candidateTemplate of templates) {
+    try {
+      const decodedTemplate = decodeMercadoLivrePayload(candidateTemplate);
+      const built = decodedTemplate
+        .replace(/\{square\}/g, safeSquare)
+        .replace(/\{2x\}/g, "")
+        .replace(/\{id\}/g, safePictureId)
+        .replace(/\{size\}/g, safeSize)
+        .replace(/\{sanitized_title\}/g, "");
+
+      const imageUrl = new URL(built);
+      if (
+        imageUrl.protocol === "https:" &&
+        imageUrl.hostname.toLowerCase().endsWith("mlstatic.com") &&
+        imageUrl.toString().includes(safePictureId)
+      ) {
+        return imageUrl;
+      }
+    } catch {
+      // Tenta o template seguinte.
+    }
+  }
+
+  return null;
+}
+
+function extractMercadoLivrePolycardImage(html: string, sourceUrl: URL) {
+  if (!isMercadoLivreUrl(sourceUrl)) return null;
+
+  const expectedItemId = compactMercadoLivreItemId(sourceUrl);
+  if (!expectedItemId) return null;
+
+  const text = decodeMercadoLivrePayload(html);
+  const idPattern = new RegExp(`\\b${expectedItemId}\\b`, "gi");
+
+  for (const idMatch of text.matchAll(idPattern)) {
+    const idIndex = idMatch.index ?? -1;
+    if (idIndex < 0) continue;
+
+    const metadataIndex = text.lastIndexOf('"metadata"', idIndex);
+    if (metadataIndex < 0 || idIndex - metadataIndex > 8_000) continue;
+
+    const nextMetadataIndex = text.indexOf('"metadata"', metadataIndex + 10);
+    const cardEnd =
+      nextMetadataIndex > metadataIndex && nextMetadataIndex - metadataIndex <= 30_000
+        ? nextMetadataIndex
+        : Math.min(text.length, metadataIndex + 30_000);
+    const cardBlock = text.slice(metadataIndex, cardEnd);
+
+    if (!new RegExp(`\\b${expectedItemId}\\b`, "i").test(cardBlock)) continue;
+
+    const pictureId =
+      cardBlock.match(
+        /"pictures"\s*:\s*\{[\s\S]{0,8_000}?"pictures"\s*:\s*\[\s*\{[\s\S]{0,1_500}?"id"\s*:\s*"([A-Z0-9_-]+-[A-Z]{3}\d+_\d{6})"/i,
+      )?.[1] ??
+      cardBlock.match(/"id"\s*:\s*"([A-Z0-9_-]+-[A-Z]{3}\d+_\d{6})"/i)?.[1] ??
+      "";
+
+    if (!pictureId) continue;
+
+    const template = lastJsonStringBefore(text, "picture_template", metadataIndex);
+    const size = lastJsonStringBefore(text, "picture_size_default", metadataIndex) || "V";
+    const squareFromContext =
+      lastJsonStringBefore(text, "picture_square_default", metadataIndex) || "Q";
+    const squareFromCard =
+      cardBlock.match(/"square"\s*:\s*"([A-Z0-9]+)"/i)?.[1] ?? squareFromContext;
+
+    const imageUrl = buildMercadoLivrePolycardImageUrl(
+      template,
+      pictureId,
+      squareFromCard,
+      size,
+    );
+    if (imageUrl) return imageUrl;
+  }
+
+  return null;
+}
+
 function extractProductImage(html: string, pageUrl: URL) {
   const metaCandidates = new Map<string, string>();
   const rawCandidates: string[] = [];
@@ -549,9 +696,8 @@ function mercadoLivreCanonicalCandidate(url: URL) {
   const itemId = mercadoLivreItemId(url);
   if (!itemId) return null;
 
-  const slug = mercadoLivreSlug(url);
-  const path = slug ? `${itemId}-${slug}-_JM` : `${itemId}-_JM`;
-  return new URL(`https://produto.mercadolivre.com.br/${path}`);
+  const compactItemId = itemId.replace(/[^A-Z0-9]/gi, "");
+  return new URL(`https://produto.mercadolivre.com.br/${compactItemId}`);
 }
 
 function looksLikeDirectImageUrl(url: URL) {
@@ -660,6 +806,21 @@ async function captureOpenGraphAsSocialCrawler(rawUrl: string): Promise<Captured
       const htmlBytes = await readLimited(page.response, MAX_HTML_BYTES);
       const html = new TextDecoder("utf-8").decode(htmlBytes);
 
+      // Links longos /up/MLBU... do Mercado Livre podem esconder a foto real
+      // no estado interno dos cards (Polycard), em vez de expô-la no og:image.
+      const polycardImage = extractMercadoLivrePolycardImage(html, productUrl);
+      if (polycardImage) {
+        try {
+          return await downloadProductImage(
+            polycardImage,
+            page.finalUrl.toString(),
+            userAgent,
+          );
+        } catch {
+          // Continua para OG Image e demais fontes.
+        }
+      }
+
       // Aqui usamos somente as tags sociais que o WhatsApp/Meta consomem.
       // No Mercado Livre a imagem precisa continuar parecendo uma foto real
       // de produto (mlstatic/D_NQ_), para não voltar ao ícone institucional.
@@ -743,6 +904,15 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
   let html = new TextDecoder("utf-8").decode(htmlBytes);
   let imagePageUrl = page.finalUrl;
 
+  const initialPolycardImage = extractMercadoLivrePolycardImage(html, productUrl);
+  if (initialPolycardImage) {
+    try {
+      return await downloadProductImage(initialPolycardImage, page.finalUrl.toString());
+    } catch {
+      // Continua para canonical, OG Image e demais fontes.
+    }
+  }
+
   const currentHost = page.finalUrl.hostname.toLowerCase();
   const isMercadoLivre =
     currentHost === "mercadolivre.com.br" ||
@@ -793,6 +963,15 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
           // Se a URL canônica não puder ser lida, usa o HTML original.
         }
       }
+    }
+  }
+
+  const canonicalPolycardImage = extractMercadoLivrePolycardImage(html, productUrl);
+  if (canonicalPolycardImage) {
+    try {
+      return await downloadProductImage(canonicalPolycardImage, imagePageUrl.toString());
+    } catch {
+      // Continua para OG Image.
     }
   }
 
