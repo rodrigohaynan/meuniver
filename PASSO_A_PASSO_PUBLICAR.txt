@@ -1,0 +1,56 @@
+MEU CONVITE — PASSO A PASSO PARA PUBLICAR
+
+1) CRIE UM NOVO PROJETO NO SUPABASE
+   - Não use o banco do convite da Liene.
+   - Abra SQL Editor.
+   - Cole e execute todo o conteúdo de supabase/schema.sql.
+
+2) COPIE AS CHAVES DO SUPABASE
+   Project Settings > API:
+   - Project URL
+   - anon / publishable key
+
+3) CONFIGURE AS VARIÁVEIS NO NETLIFY
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY
+   NEXT_PUBLIC_APP_URL
+   NEXT_PUBLIC_APP_NAME
+
+4) LOGIN GOOGLE
+   Supabase > Authentication > Providers > Google.
+   Ative e informe Client ID e Client Secret do Google Cloud.
+   Configure a URL de callback exibida pelo próprio Supabase no Google Cloud.
+
+5) LOGIN FACEBOOK
+   Supabase > Authentication > Providers > Facebook.
+   Ative e informe App ID e App Secret do Meta Developers.
+   Configure a URL de callback exibida pelo próprio Supabase.
+
+6) URLS DE AUTENTICAÇÃO
+   Supabase > Authentication > URL Configuration:
+   Site URL = https://SEU-SITE.netlify.app
+   Redirect URLs:
+   https://SEU-SITE.netlify.app/auth/callback
+   http://localhost:3000/auth/callback
+
+7) GITHUB
+   Recomendado: criar um NOVO repositório para esta plataforma.
+   Não substitua o repositório do convite da Liene enquanto ele estiver em uso.
+
+8) NETLIFY
+   Conecte o novo repositório.
+   Build command: npm run build
+   O Netlify detectará Next.js.
+   Node: 22.
+
+9) PRIMEIRO TESTE
+   - Criar conta.
+   - Criar convite.
+   - Escolher tema.
+   - Enviar foto.
+   - Adicionar presentes.
+   - Publicar.
+   - Abrir /c/slug em janela anônima.
+   - Confirmar presença.
+   - Reservar um presente.
+   - Verificar que o dono enxerga as respostas no painel.
