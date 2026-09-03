@@ -19,6 +19,9 @@ export type Invitation = {
   theme_key: string;
   layout_key: LayoutKey;
   hero_image_url: string | null;
+  hero_image_zoom: number;
+  hero_image_x: number;
+  hero_image_y: number;
   gift_enabled: boolean;
   rsvp_enabled: boolean;
   created_at: string;
@@ -33,6 +36,7 @@ export type GiftItem = {
   price_hint: string;
   suggestion_url: string | null;
   manual_image_url: string | null;
+  suggestion_image_url: string | null;
   sort_order: number;
   reserved: boolean;
   created_at: string;

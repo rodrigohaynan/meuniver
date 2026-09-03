@@ -28,8 +28,8 @@ export default async function InvitationEditorPage({ params }: { params: Promise
   const invitation = invitationData as Invitation;
 
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-7 sm:px-8 sm:py-9">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/painel" className="inline-flex items-center gap-2 text-sm font-bold text-[#765f65]"><ArrowLeft className="size-4" /> Meus convites</Link>
           <h1 className="mt-3 font-display text-3xl font-bold text-[#351820]">{invitation.event_title}</h1>

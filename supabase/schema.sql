@@ -21,6 +21,9 @@ create table if not exists public.invitations (
   theme_key text not null default 'wine-rose',
   layout_key text not null default 'elegant' check (layout_key in ('elegant','modern','kids')),
   hero_image_url text,
+  hero_image_zoom numeric not null default 1,
+  hero_image_x integer not null default 50,
+  hero_image_y integer not null default 50,
   gift_enabled boolean not null default true,
   rsvp_enabled boolean not null default true,
   created_at timestamptz not null default now(),
@@ -35,6 +38,7 @@ create table if not exists public.gifts (
   price_hint text not null default '',
   suggestion_url text,
   manual_image_url text,
+  suggestion_image_url text,
   sort_order integer not null default 1,
   reserved boolean not null default false,
   created_at timestamptz not null default now()
