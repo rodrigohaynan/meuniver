@@ -989,7 +989,161 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
   }
 
   const fallbackImage = extractProductImage(html, imagePageUrl);
+
+  if (isMercadoLivreMicrolinkTarget(productUrl) && !isMercadoLivreGalleryImage(fallbackImage)) {
+    throw new Error(
+      "O Mercado Livre retornou uma imagem institucional; tentando a galeria renderizada.",
+    );
+  }
+
   return downloadProductImage(fallbackImage, imagePageUrl.toString());
+}
+
+function isMercadoLivreMicrolinkTarget(url: URL) {
+  const host = url.hostname.toLowerCase();
+  return (
+    host === "meli.la" ||
+    host.endsWith(".meli.la") ||
+    host === "mercadolivre.com.br" ||
+    host.endsWith(".mercadolivre.com.br") ||
+    host === "mercadolibre.com" ||
+    host.endsWith(".mercadolibre.com")
+  );
+}
+
+function isMercadoLivreGalleryImage(url: URL) {
+  const host = url.hostname.toLowerCase();
+  const path = decodeURIComponent(url.pathname).toLowerCase();
+
+  if (!(host === "mlstatic.com" || host.endsWith(".mlstatic.com"))) return false;
+
+  if (
+    path.includes("/storage/logos") ||
+    path.includes("frontend-assets") ||
+    path.includes("logo") ||
+    path.includes("placeholder") ||
+    path.includes("handshake") ||
+    path.includes("social")
+  ) {
+    return false;
+  }
+
+  // As fotos de produto do Mercado Livre normalmente usam estes prefixos
+  // na CDN. Isso impede que uma arte institucional seja armazenada.
+  return /\/d_(?:nq|q)_[a-z0-9_]*np/i.test(url.pathname) || /\/d_nq_/i.test(url.pathname);
+}
+
+async function downloadMicrolinkImage(
+  imageUrl: URL,
+  productUrl: URL,
+): Promise<CapturedProductImage> {
+  if (isMercadoLivreMicrolinkTarget(productUrl) && !isMercadoLivreGalleryImage(imageUrl)) {
+    throw new Error("A imagem renderizada não corresponde à galeria do produto do Mercado Livre.");
+  }
+
+  const image = await fetchPublic(
+    imageUrl,
+    {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        referer: productUrl.toString(),
+      },
+    },
+    IMAGE_TIMEOUT_MS,
+  );
+
+  if (!image.response.ok) {
+    await image.response.body?.cancel().catch(() => undefined);
+    throw new Error("A imagem encontrada no anúncio não pôde ser baixada.");
+  }
+
+  const imageBytes = await readLimited(image.response, MAX_IMAGE_BYTES);
+  const contentType = detectedImageType(
+    imageBytes,
+    image.response.headers.get("content-type") ?? "",
+  );
+  if (!contentType) {
+    throw new Error("O arquivo encontrado no anúncio não é uma imagem válida.");
+  }
+
+  const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
+  new Uint8Array(imageBuffer).set(imageBytes);
+
+  return {
+    blob: new Blob([imageBuffer], { type: contentType }),
+    sourceUrl: image.finalUrl.toString(),
+  };
+}
+
+async function captureMercadoLivreRenderedViaMicrolink(
+  productUrl: URL,
+): Promise<CapturedProductImage> {
+  // Diferente do fallback antigo: aqui o Microlink abre a página em navegador
+  // renderizado e lê diretamente o primeiro <img> da galeria do produto.
+  const metadataUrl = new URL("https://api.microlink.io/");
+  metadataUrl.searchParams.set("url", productUrl.toString());
+  metadataUrl.searchParams.set("meta", "false");
+  metadataUrl.searchParams.set("prerender", "true");
+  metadataUrl.searchParams.set("waitForTimeout", "1200");
+  metadataUrl.searchParams.set(
+    "data.image.selector",
+    "figure.ui-pdp-gallery__figure img, .ui-pdp-gallery__figure img, img.ui-pdp-gallery__figure__image, img.ui-pdp-image",
+  );
+  metadataUrl.searchParams.set("data.image.attr", "src");
+  metadataUrl.searchParams.set("data.image.type", "image");
+
+  const metadata = await fetchPublic(
+    metadataUrl,
+    {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "application/json",
+      },
+    },
+    18_000,
+  );
+
+  if (!metadata.response.ok) {
+    await metadata.response.body?.cancel().catch(() => undefined);
+    throw new Error("O navegador alternativo não conseguiu renderizar o anúncio.");
+  }
+
+  const metadataBytes = await readLimited(metadata.response, 1_000_000);
+  let imageAddress = "";
+
+  try {
+    const payload = JSON.parse(new TextDecoder("utf-8").decode(metadataBytes)) as {
+      status?: string;
+      data?: {
+        image?:
+          | string
+          | {
+              url?: string;
+            };
+      };
+    };
+
+    const image = payload.data?.image;
+    imageAddress = typeof image === "string" ? image : image?.url ?? "";
+  } catch {
+    throw new Error("A resposta do navegador alternativo não pôde ser interpretada.");
+  }
+
+  if (!imageAddress) {
+    throw new Error("A galeria renderizada do anúncio não informou uma imagem.");
+  }
+
+  let imageUrl: URL;
+  try {
+    imageUrl = new URL(imageAddress, productUrl);
+  } catch {
+    throw new Error("A imagem renderizada possui um endereço inválido.");
+  }
+
+  return downloadMicrolinkImage(imageUrl, productUrl);
 }
 
 async function captureProductImageViaMicrolink(rawUrl: string): Promise<CapturedProductImage> {
@@ -1001,6 +1155,13 @@ async function captureProductImageViaMicrolink(rawUrl: string): Promise<Captured
   }
 
   await assertPublicUrl(productUrl);
+
+  // Para Mercado Livre, não usa mais a metadata normalizada como primeira
+  // alternativa, porque ela pode devolver a arte institucional. O navegador
+  // renderizado procura diretamente a imagem visível na galeria.
+  if (isMercadoLivreMicrolinkTarget(productUrl)) {
+    return captureMercadoLivreRenderedViaMicrolink(productUrl);
+  }
 
   const metadataUrl = new URL("https://api.microlink.io/");
   metadataUrl.searchParams.set("url", productUrl.toString());
@@ -1047,39 +1208,7 @@ async function captureProductImageViaMicrolink(rawUrl: string): Promise<Captured
     throw new Error("A imagem encontrada no anúncio possui um endereço inválido.");
   }
 
-  if (!isLikelyOpenGraphProductImage(imageUrl, productUrl)) {
-    throw new Error("O serviço alternativo retornou uma imagem institucional, não a foto do produto.");
-  }
-
-  const image = await fetchPublic(
-    imageUrl,
-    {
-      method: "GET",
-      headers: {
-        "user-agent": USER_AGENT,
-        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        referer: productUrl.toString(),
-      },
-    },
-    IMAGE_TIMEOUT_MS,
-  );
-
-  if (!image.response.ok) {
-    await image.response.body?.cancel().catch(() => undefined);
-    throw new Error("A imagem encontrada no anúncio não pôde ser baixada.");
-  }
-
-  const imageBytes = await readLimited(image.response, MAX_IMAGE_BYTES);
-  const contentType = detectedImageType(imageBytes, image.response.headers.get("content-type") ?? "");
-  if (!contentType) throw new Error("O arquivo encontrado no anúncio não é uma imagem válida.");
-
-  const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
-  new Uint8Array(imageBuffer).set(imageBytes);
-
-  return {
-    blob: new Blob([imageBuffer], { type: contentType }),
-    sourceUrl: image.finalUrl.toString(),
-  };
+  return downloadMicrolinkImage(imageUrl, productUrl);
 }
 
 export async function captureProductImageFromUrl(rawUrl: string): Promise<CapturedProductImage> {
