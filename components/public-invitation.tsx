@@ -4,7 +4,7 @@ import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { ExternalLink, Gift, MapPin, Search, UsersRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
-import type { GiftItem, Invitation } from "@/lib/types";
+import type { GiftItem, Invitation, Rsvp } from "@/lib/types";
 
 function shopeeSearch(name: string) {
   return `https://shopee.com.br/search?keyword=${encodeURIComponent(name)}`;
@@ -21,7 +21,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
   const [guestContact, setGuestContact] = useState("");
   const [rsvpContact, setRsvpContact] = useState("");
   const [rsvpWhatsapp, setRsvpWhatsapp] = useState("");
-  const [attendees, setAttendees] = useState([{ name: "", category: "adult" as const }]);
+  const [attendees, setAttendees] = useState<Rsvp["attendees"]>([{ name: "", category: "adult" }]);
   const [message, setMessage] = useState("");
 
   const supabase = useMemo(() => createClient(), []);
