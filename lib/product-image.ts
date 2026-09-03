@@ -1146,6 +1146,114 @@ async function captureMercadoLivreRenderedViaMicrolink(
   return downloadMicrolinkImage(imageUrl, productUrl);
 }
 
+function openGraphIoAppId() {
+  return (
+    process.env.OPENGRAPH_IO_APP_ID?.trim() ||
+    process.env.OPENGRAPH_APP_ID?.trim() ||
+    ""
+  );
+}
+
+function openGraphIoProxyMode() {
+  return (process.env.OPENGRAPH_IO_PROXY_MODE?.trim().toLowerCase() || "premium");
+}
+
+async function captureMercadoLivreViaOpenGraphIo(
+  productUrl: URL,
+): Promise<CapturedProductImage> {
+  const appId = openGraphIoAppId();
+  if (!appId) {
+    throw new Error("Captura avançada do Mercado Livre não está configurada.");
+  }
+
+  await assertPublicUrl(productUrl);
+
+  const endpoint = new URL(
+    `https://opengraph.io/api/3.0/site/${encodeURIComponent(productUrl.toString())}`,
+  );
+  endpoint.searchParams.set("app_id", appId);
+
+  // Não reutiliza cache de uma leitura anterior que possa ter recebido
+  // a imagem institucional do Mercado Livre.
+  endpoint.searchParams.set("cache_ok", "false");
+  endpoint.searchParams.set("retry", "true");
+  endpoint.searchParams.set("auto_render", "false");
+  endpoint.searchParams.set("accept_lang", "pt-BR");
+
+  // O problema observado acontece em IPs de datacenter. Premium usa proxy
+  // residencial; "mobile" pode ser habilitado apenas pela variável de ambiente,
+  // sem nova alteração de código, se o residencial ainda não for suficiente.
+  if (openGraphIoProxyMode() === "mobile") {
+    endpoint.searchParams.set("use_superior", "true");
+  } else {
+    endpoint.searchParams.set("use_premium", "true");
+  }
+
+  const result = await fetchPublic(
+    endpoint,
+    {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "application/json",
+      },
+    },
+    25_000,
+  );
+
+  if (!result.response.ok) {
+    const status = result.response.status;
+    await result.response.body?.cancel().catch(() => undefined);
+    throw new Error(`O proxy residencial respondeu com erro (${status}).`);
+  }
+
+  const bytes = await readLimited(result.response, 1_000_000);
+
+  let imageAddress = "";
+  try {
+    const payload = JSON.parse(new TextDecoder("utf-8").decode(bytes)) as {
+      hybridGraph?: {
+        image?: string;
+      };
+      openGraph?: {
+        image?:
+          | string
+          | {
+              url?: string;
+            };
+      };
+    };
+
+    const openGraphImage = payload.openGraph?.image;
+    imageAddress =
+      payload.hybridGraph?.image ??
+      (typeof openGraphImage === "string"
+        ? openGraphImage
+        : openGraphImage?.url ?? "");
+  } catch {
+    throw new Error("A resposta do proxy residencial não pôde ser interpretada.");
+  }
+
+  if (!imageAddress) {
+    throw new Error("O proxy residencial não encontrou uma OG Image para esse produto.");
+  }
+
+  let imageUrl: URL;
+  try {
+    imageUrl = new URL(imageAddress, productUrl);
+  } catch {
+    throw new Error("A OG Image encontrada possui um endereço inválido.");
+  }
+
+  if (!isMercadoLivreGalleryImage(imageUrl)) {
+    throw new Error(
+      "O Mercado Livre ainda retornou uma imagem institucional em vez da foto do produto.",
+    );
+  }
+
+  return downloadMicrolinkImage(imageUrl, productUrl);
+}
+
 async function captureProductImageViaMicrolink(rawUrl: string): Promise<CapturedProductImage> {
   let productUrl: URL;
   try {
@@ -1219,8 +1327,8 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
     // As funções abaixo devolverão a mensagem padronizada.
   }
 
-  // Primeira tentativa: reproduz o tipo de requisição que gera a miniatura
-  // quando o link é compartilhado no WhatsApp/Meta.
+  // 1) Primeira tentativa: preview social (mantém funcionando meli.la quando
+  // o próprio Mercado Livre entrega a OG Image normalmente).
   let socialError: Error | null = null;
   try {
     return await captureOpenGraphAsSocialCrawler(rawUrl);
@@ -1228,28 +1336,58 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
     socialError = error instanceof Error ? error : null;
   }
 
-  // Segunda tentativa: fluxo normal do capturador já usado no projeto.
+  // 2) Segunda tentativa: captura direta normal, incluindo Polycard/canonical.
+  let directError: Error | null = null;
   try {
     return await captureProductImageDirect(rawUrl);
-  } catch (directError) {
-    const canonicalCandidate = originalUrl ? mercadoLivreCanonicalCandidate(originalUrl) : null;
+  } catch (error) {
+    directError = error instanceof Error ? error : null;
+  }
 
-    if (canonicalCandidate) {
-      try {
-        return await captureProductImageDirect(canonicalCandidate.toString());
-      } catch {
-        // Continua para o fallback de metadados.
-      }
-    }
-
+  // 3) Links longos do Mercado Livre podem entregar página reduzida ou antibot
+  // para IPs de datacenter. Neste caso muda a ORIGEM da requisição usando proxy
+  // residencial, em vez de continuar tentando interpretar o mesmo HTML errado.
+  if (originalUrl && isMercadoLivreMicrolinkTarget(originalUrl) && openGraphIoAppId()) {
     try {
-      return await captureProductImageViaMicrolink(rawUrl);
-    } catch {
-      if (socialError) throw socialError;
-      throw directError instanceof Error
-        ? directError
-        : new Error("Não foi possível capturar automaticamente a imagem do anúncio.");
+      return await captureMercadoLivreViaOpenGraphIo(originalUrl);
+    } catch (error) {
+      console.warn(
+        "[gift-image] OpenGraph.io Mercado Livre:",
+        error instanceof Error ? error.message : error,
+      );
     }
+  }
+
+  // 4) URL reconstruída por MLB apenas como fallback adicional.
+  const canonicalCandidate =
+    originalUrl ? mercadoLivreCanonicalCandidate(originalUrl) : null;
+
+  if (canonicalCandidate) {
+    try {
+      return await captureProductImageDirect(canonicalCandidate.toString());
+    } catch {
+      // Continua para o último fallback.
+    }
+  }
+
+  // 5) Último fallback: navegador/metadata alternativos já existentes.
+  try {
+    return await captureProductImageViaMicrolink(rawUrl);
+  } catch {
+    if (
+      originalUrl &&
+      isMercadoLivreMicrolinkTarget(originalUrl) &&
+      !openGraphIoAppId()
+    ) {
+      throw new Error(
+        "Este link grande do Mercado Livre exige a captura avançada. Configure OPENGRAPH_IO_APP_ID no Netlify.",
+      );
+    }
+
+    if (socialError) throw socialError;
+    if (directError) throw directError;
+
+    throw new Error("Não foi possível capturar automaticamente a imagem do anúncio.");
   }
 }
 
