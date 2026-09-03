@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { CalendarDays, ExternalLink, Gift, MapPin, Search, Sparkles, UsersRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
