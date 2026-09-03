@@ -32,6 +32,25 @@ function formatAge(age: number) {
   return `${value} ${value === 1 ? "ano" : "anos"}`;
 }
 
+function suggestionImageFingerprint(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function suggestionImageProxyUrl(giftId: string, suggestionUrl: string) {
+  const fingerprint = suggestionImageFingerprint(suggestionUrl);
+  const cacheKey = `${giftId}-${fingerprint}`;
+  return `/api/product-image/${encodeURIComponent(cacheKey)}?url=${encodeURIComponent(suggestionUrl)}`;
+}
+
+function isStoredSuggestionImage(value: string | null) {
+  return Boolean(value?.includes('/storage/v1/object/public/invite-media/'));
+}
+
 export function InvitationEditor({
   initialInvitation,
   initialGifts,
@@ -216,7 +235,9 @@ export function InvitationEditor({
     setMessage("");
 
     const suggestionUrl = gift.suggestion_url?.trim() || null;
-    let suggestionImageUrl = suggestionUrl ? gift.suggestion_image_url : null;
+    let suggestionImageUrl = suggestionUrl && isStoredSuggestionImage(gift.suggestion_image_url)
+      ? gift.suggestion_image_url
+      : null;
 
     const { error: baseError } = await supabase.from("gifts").update({
       name: gift.name.trim(),
@@ -538,30 +559,37 @@ function MiniPreview({ invitation }: { invitation: Invitation }) {
 function GiftImagePreview({ gift }: { gift: GiftItem }) {
   const [failed, setFailed] = useState(false);
 
+  const storedSuggestionImage = isStoredSuggestionImage(gift.suggestion_image_url)
+    ? gift.suggestion_image_url
+    : null;
+  const proxyImage = gift.suggestion_url
+    ? suggestionImageProxyUrl(gift.id, gift.suggestion_url)
+    : null;
+  const src = gift.manual_image_url || storedSuggestionImage || proxyImage;
+
   useEffect(() => {
     setFailed(false);
-  }, [gift.manual_image_url, gift.suggestion_image_url]);
-
-  const suggestionImage =
-    gift.suggestion_image_url && /^https?:\/\//i.test(gift.suggestion_image_url)
-      ? gift.suggestion_image_url
-      : null;
-  const src = gift.manual_image_url || suggestionImage;
+  }, [gift.id, gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url, src]);
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-[#f6eee9]">
       {src && !failed ? (
         <img
-          key={src}
+          key={gift.manual_image_url ?? storedSuggestionImage ?? gift.suggestion_url ?? gift.id}
           src={src}
           alt={gift.name}
-          referrerPolicy="no-referrer"
           className="h-40 w-full object-contain"
           onError={() => setFailed(true)}
         />
       ) : <div className="grid h-40 place-items-center text-3xl">🎁</div>}
       <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[#765f65]">
-        {gift.manual_image_url ? "Foto manual" : src && !failed ? "Imagem do link" : "Sem imagem"}
+        {gift.manual_image_url
+          ? "Foto manual"
+          : storedSuggestionImage && !failed
+            ? "Imagem capturada"
+            : proxyImage && !failed
+              ? "Prévia do link"
+              : "Sem imagem"}
       </span>
     </div>
   );

@@ -14,6 +14,25 @@ function mercadoLivreSearch(name: string) {
   return `https://lista.mercadolivre.com.br/${encodeURIComponent(name)}`;
 }
 
+function suggestionImageFingerprint(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function suggestionImageProxyUrl(giftId: string, suggestionUrl: string) {
+  const fingerprint = suggestionImageFingerprint(suggestionUrl);
+  const cacheKey = `${giftId}-${fingerprint}`;
+  return `/api/product-image/${encodeURIComponent(cacheKey)}?url=${encodeURIComponent(suggestionUrl)}`;
+}
+
+function isStoredSuggestionImage(value: string | null) {
+  return Boolean(value?.includes('/storage/v1/object/public/invite-media/'));
+}
+
 function formatAge(age: number) {
   const value = Math.max(1, Math.round(Number(age) || 1));
   return `${value} ${value === 1 ? "ano" : "anos"}`;
@@ -240,15 +259,18 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
 function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
   const [failed, setFailed] = useState(false);
 
+  const storedSuggestionImage = isStoredSuggestionImage(gift.suggestion_image_url)
+    ? gift.suggestion_image_url
+    : null;
+  const proxyImage = gift.suggestion_url
+    ? suggestionImageProxyUrl(gift.id, gift.suggestion_url)
+    : null;
+  const src = gift.manual_image_url || storedSuggestionImage || proxyImage;
+  const imageComesFromProxy = !gift.manual_image_url && !storedSuggestionImage && Boolean(proxyImage);
+
   useEffect(() => {
     setFailed(false);
-  }, [gift.manual_image_url, gift.suggestion_image_url]);
-
-  const suggestionImage =
-    gift.suggestion_image_url && /^https?:\/\//i.test(gift.suggestion_image_url)
-      ? gift.suggestion_image_url
-      : null;
-  const src = gift.manual_image_url || suggestionImage;
+  }, [gift.id, gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url, src]);
 
   if (!src || failed) {
     return <div className="relative grid aspect-[4/3] place-items-center bg-[var(--i-soft)]"><Gift className="size-10 text-[var(--i-accent)]" /><span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)]">{String(index + 1).padStart(2, "0")}</span></div>;
@@ -257,12 +279,16 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
   return (
     <div className="relative aspect-[4/3] overflow-hidden bg-[var(--i-soft)]">
       <img
-        key={src}
+        key={gift.manual_image_url ?? storedSuggestionImage ?? gift.suggestion_url ?? gift.id}
         src={src}
         alt={`Imagem sugerida de ${gift.name}`}
-        referrerPolicy="no-referrer"
         className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
-        onError={() => setFailed(true)}
+        onError={() => {
+          // Igual ao convite da Liene: se a tentativa ao vivo falhar, o card
+          // volta para o ícone em vez de manter uma imagem quebrada.
+          if (imageComesFromProxy) setFailed(true);
+          else setFailed(true);
+        }}
       />
       <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)] shadow-sm">{String(index + 1).padStart(2, "0")}</span>
     </div>

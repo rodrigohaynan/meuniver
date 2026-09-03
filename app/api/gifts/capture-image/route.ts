@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { captureProductImage, resolveProductImageUrl } from "@/lib/product-image";
+import { captureProductImageFromUrl } from "@/lib/product-image";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
   const { data: gift, error: giftError } = await supabase
     .from("gifts")
-    .select("id, invitation_id, suggestion_url, suggestion_image_url")
+    .select("id, invitation_id, suggestion_url, suggestion_image_url, manual_image_url")
     .eq("id", giftId)
     .single();
 
@@ -81,24 +81,35 @@ export async function POST(request: Request) {
     return Response.json({ error: "Informe o link de sugestão antes de capturar a imagem." }, { status: 400 });
   }
 
+  // Mesma prioridade usada no convite da Liene: foto manual não é substituída
+  // pela captura automática. A imagem do link fica armazenada separadamente.
+  if (gift.manual_image_url) {
+    return Response.json({
+      imageUrl: gift.suggestion_image_url,
+      suggestionUrl,
+      skipped: true,
+      warning: "A foto manual tem prioridade. A imagem do link não foi substituída.",
+    });
+  }
+
   try {
-    // Mesmo princípio usado no convite da Liene: captura uma vez no servidor,
-    // armazena uma cópia própria e associa a imagem exclusivamente a este presente.
-    const captured = await captureProductImage(suggestionUrl);
-    const extension = extensionFor(captured.contentType);
+    const captured = await captureProductImageFromUrl(suggestionUrl);
+    const extension = extensionFor(captured.blob.type || "image/jpeg");
     const path = `${user.id}/${gift.invitation_id}/gift-${gift.id}/suggestion-${randomUUID()}.${extension}`;
 
-    const capturedBlob = new Blob([captured.bytes], { type: captured.contentType });
     const { error: uploadError } = await supabase.storage
       .from("invite-media")
-      .upload(path, capturedBlob, {
+      .upload(path, captured.blob, {
         upsert: false,
-        contentType: captured.contentType,
+        contentType: captured.blob.type || "image/jpeg",
         cacheControl: "31536000",
       });
 
     if (uploadError) {
-      return Response.json({ error: `A imagem foi encontrada, mas não pôde ser armazenada: ${uploadError.message}` }, { status: 502 });
+      return Response.json(
+        { error: `A imagem foi encontrada, mas não pôde ser armazenada: ${uploadError.message}` },
+        { status: 502 },
+      );
     }
 
     const { data: publicData } = supabase.storage.from("invite-media").getPublicUrl(path);
@@ -111,7 +122,10 @@ export async function POST(request: Request) {
 
     if (updateError) {
       await supabase.storage.from("invite-media").remove([path]).catch(() => undefined);
-      return Response.json({ error: `A imagem foi capturada, mas não pôde ser vinculada ao presente: ${updateError.message}` }, { status: 502 });
+      return Response.json(
+        { error: `A imagem foi capturada, mas não pôde ser vinculada ao presente: ${updateError.message}` },
+        { status: 502 },
+      );
     }
 
     const previousPath = storagePathFromPublicUrl(gift.suggestion_image_url);
@@ -119,46 +133,18 @@ export async function POST(request: Request) {
       await supabase.storage.from("invite-media").remove([previousPath]).catch(() => undefined);
     }
 
-    return Response.json({ imageUrl, suggestionUrl });
-  } catch (captureError) {
-    try {
-      const remoteImageUrl = await resolveProductImageUrl(suggestionUrl);
-
-      const { error: updateError } = await supabase
-        .from("gifts")
-        .update({ suggestion_url: suggestionUrl, suggestion_image_url: remoteImageUrl })
-        .eq("id", gift.id);
-
-      if (updateError) {
-        return Response.json(
-          { error: `A foto do produto foi localizada, mas não pôde ser vinculada ao presente: ${updateError.message}` },
-          { status: 502 },
-        );
-      }
-
-      const previousPath = storagePathFromPublicUrl(gift.suggestion_image_url);
-      if (previousPath) {
-        await supabase.storage.from("invite-media").remove([previousPath]).catch(() => undefined);
-      }
-
-      return Response.json({
-        imageUrl: remoteImageUrl,
-        suggestionUrl,
-        stored: false,
-        warning: "O marketplace bloqueou a cópia da imagem no servidor; a foto real será exibida diretamente do anúncio.",
-      });
-    } catch (resolveError) {
-      const captureMessage = captureError instanceof Error
-        ? captureError.message
-        : "Não foi possível copiar a imagem do anúncio.";
-      const resolveMessage = resolveError instanceof Error
-        ? resolveError.message
-        : "Não foi possível localizar a URL real da foto.";
-
-      return Response.json(
-        { error: `${captureMessage} ${resolveMessage}` },
-        { status: 422 },
-      );
-    }
+    return Response.json({ imageUrl, suggestionUrl, imageCaptured: true });
+  } catch (error) {
+    // Igual ao convite da Liene: se a gravação automática não funcionar,
+    // não salvamos URL externa quebrada nem imagem institucional. O card ainda
+    // poderá tentar o proxy ao vivo, usando uma URL única por presente/link.
+    return Response.json(
+      {
+        error: error instanceof Error
+          ? error.message
+          : "Não foi possível capturar automaticamente a imagem do anúncio.",
+      },
+      { status: 422 },
+    );
   }
 }

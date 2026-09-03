@@ -1,51 +1,51 @@
-import { captureProductImage } from "@/lib/product-image";
+import { captureProductImageFromUrl } from "@/lib/product-image";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const revalidate = 0;
 
-function validateProductUrl(rawUrl: string) {
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    throw new Error("Link de sugestão inválido.");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("O link precisa usar http ou https.");
-  }
-  if (url.username || url.password) throw new Error("O link informado não é permitido.");
-  return url.toString();
+type RouteContext = {
+  params: Promise<{ cacheKey: string }>;
+};
+
+function normalizeProductUrl(value: string) {
+  const input = value.trim().slice(0, 1000);
+  if (!input) return "";
+  return /^https?:\/\//i.test(input) ? input : `https://${input}`;
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ cacheKey: string }> }) {
-  const { cacheKey } = await params;
-  if (!/^[a-zA-Z0-9_-]{1,120}$/.test(cacheKey)) {
-    return new Response("Chave inválida.", { status: 400, headers: { "Cache-Control": "no-store" } });
+export async function GET(request: Request, context: RouteContext) {
+  // Igual ao convite da Liene: cada presente/link recebe um caminho distinto,
+  // evitando que cache de navegador/CDN misture imagens de presentes diferentes.
+  await context.params;
+
+  const rawUrl = new URL(request.url).searchParams.get("url") ?? "";
+  const productUrl = normalizeProductUrl(rawUrl);
+  if (!productUrl) {
+    return new Response("Link não informado.", {
+      status: 400,
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   }
 
-  const requestUrl = new URL(request.url);
-  const rawUrl = requestUrl.searchParams.get("url")?.trim() ?? "";
-  if (!rawUrl) return new Response("Link não informado.", { status: 400, headers: { "Cache-Control": "no-store" } });
-
   try {
-    const productUrl = validateProductUrl(rawUrl);
-    const image = await captureProductImage(productUrl);
-    return new Response(image.bytes, {
+    const captured = await captureProductImageFromUrl(productUrl);
+    return new Response(await captured.blob.arrayBuffer(), {
       headers: {
-        "Content-Type": image.contentType,
+        "Content-Type": captured.blob.type || "image/jpeg",
         "Cache-Control": "no-store, max-age=0",
         "CDN-Cache-Control": "no-store",
         "Netlify-CDN-Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Não foi possível obter a imagem do anúncio.";
-    return new Response(message, {
+  } catch {
+    return new Response("Imagem do anúncio indisponível.", {
       status: 404,
       headers: {
-        "Cache-Control": "no-store",
-        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Netlify-CDN-Cache-Control": "no-store",
       },
     });
   }
