@@ -3,6 +3,11 @@ import { isIP } from "node:net";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36";
+const SOCIAL_PREVIEW_USER_AGENTS = [
+  "WhatsApp/2.23.20.0",
+  "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+  "Facebot",
+] as const;
 const MAX_REDIRECTS = 5;
 const PAGE_TIMEOUT_MS = 10_000;
 const IMAGE_TIMEOUT_MS = 12_000;
@@ -366,13 +371,17 @@ function extractOpenGraphProductImage(html: string, pageUrl: URL) {
   return null;
 }
 
-async function downloadProductImage(imageUrl: URL, referer: string): Promise<CapturedProductImage> {
+async function downloadProductImage(
+  imageUrl: URL,
+  referer: string,
+  userAgent = USER_AGENT,
+): Promise<CapturedProductImage> {
   const image = await fetchPublic(
     imageUrl,
     {
       method: "GET",
       headers: {
-        "user-agent": USER_AGENT,
+        "user-agent": userAgent,
         accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         referer,
       },
@@ -578,6 +587,109 @@ async function captureDirectImageUrl(imageUrl: URL): Promise<CapturedProductImag
     blob: new Blob([imageBuffer], { type: contentType }),
     sourceUrl: image.finalUrl.toString(),
   };
+}
+
+
+async function captureOpenGraphAsSocialCrawler(rawUrl: string): Promise<CapturedProductImage> {
+  let productUrl: URL;
+  try {
+    productUrl = new URL(rawUrl);
+  } catch {
+    throw new Error("O link de sugestão é inválido.");
+  }
+
+  if (looksLikeDirectImageUrl(productUrl)) {
+    return captureDirectImageUrl(productUrl);
+  }
+
+  let lastError: Error | null = null;
+
+  for (const userAgent of SOCIAL_PREVIEW_USER_AGENTS) {
+    let page: { response: Response; finalUrl: URL } | null = null;
+
+    try {
+      page = await fetchPublic(
+        productUrl,
+        {
+          method: "GET",
+          headers: {
+            "user-agent": userAgent,
+            accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+            "accept-language": "pt-BR,pt;q=0.9,en;q=0.7",
+          },
+        },
+        PAGE_TIMEOUT_MS,
+      );
+
+      if (!page.response.ok) {
+        const status = page.response.status;
+        await page.response.body?.cancel().catch(() => undefined);
+        lastError = new Error(`O preview social respondeu com erro (${status}).`);
+        continue;
+      }
+
+      const pageType = page.response.headers.get("content-type")?.toLowerCase() ?? "";
+
+      if (pageType.startsWith("image/")) {
+        const imageBytes = await readLimited(page.response, MAX_IMAGE_BYTES);
+        const contentType = detectedImageType(imageBytes, pageType);
+        if (!contentType) {
+          lastError = new Error("O preview social não retornou uma imagem válida.");
+          continue;
+        }
+
+        const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
+        new Uint8Array(imageBuffer).set(imageBytes);
+
+        return {
+          blob: new Blob([imageBuffer], { type: contentType }),
+          sourceUrl: page.finalUrl.toString(),
+        };
+      }
+
+      if (
+        pageType &&
+        !pageType.includes("text/html") &&
+        !pageType.includes("application/xhtml+xml")
+      ) {
+        await page.response.body?.cancel().catch(() => undefined);
+        lastError = new Error("O preview social não retornou HTML de produto.");
+        continue;
+      }
+
+      const htmlBytes = await readLimited(page.response, MAX_HTML_BYTES);
+      const html = new TextDecoder("utf-8").decode(htmlBytes);
+
+      // Aqui usamos somente as tags sociais que o WhatsApp/Meta consomem.
+      // No Mercado Livre a imagem precisa continuar parecendo uma foto real
+      // de produto (mlstatic/D_NQ_), para não voltar ao ícone institucional.
+      const openGraphImage = extractOpenGraphProductImage(html, page.finalUrl);
+      if (!openGraphImage) {
+        lastError = new Error("O crawler social não recebeu uma OG Image válida do produto.");
+        continue;
+      }
+
+      try {
+        return await downloadProductImage(
+          openGraphImage,
+          page.finalUrl.toString(),
+          userAgent,
+        );
+      } catch (error) {
+        lastError =
+          error instanceof Error
+            ? error
+            : new Error("A OG Image do preview social não pôde ser baixada.");
+      }
+    } catch (error) {
+      lastError =
+        error instanceof Error
+          ? error
+          : new Error("Não foi possível consultar o preview social do anúncio.");
+    }
+  }
+
+  throw lastError ?? new Error("O anúncio não disponibilizou uma OG Image para preview social.");
 }
 
 async function captureProductImageDirect(rawUrl: string): Promise<CapturedProductImage> {
@@ -796,18 +908,24 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
   try {
     originalUrl = new URL(rawUrl);
   } catch {
-    // A função direta devolverá a mensagem padronizada de link inválido.
+    // As funções abaixo devolverão a mensagem padronizada.
   }
 
-  // Primeiro sempre abre o endereço real informado pelo usuário. Em páginas
-  // /up/ do Mercado Livre isso permite ler canonical/og:url e as imagens D_NQ_
-  // embutidas no HTML, exatamente o que se perde ao fabricar uma URL antes.
+  // Primeira tentativa: reproduz o tipo de requisição que gera a miniatura
+  // quando o link é compartilhado no WhatsApp/Meta.
+  let socialError: Error | null = null;
+  try {
+    return await captureOpenGraphAsSocialCrawler(rawUrl);
+  } catch (error) {
+    socialError = error instanceof Error ? error : null;
+  }
+
+  // Segunda tentativa: fluxo normal do capturador já usado no projeto.
   try {
     return await captureProductImageDirect(rawUrl);
   } catch (directError) {
     const canonicalCandidate = originalUrl ? mercadoLivreCanonicalCandidate(originalUrl) : null;
 
-    // A URL reconstruída pelo MLB fica apenas como fallback adicional.
     if (canonicalCandidate) {
       try {
         return await captureProductImageDirect(canonicalCandidate.toString());
@@ -819,9 +937,11 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
     try {
       return await captureProductImageViaMicrolink(rawUrl);
     } catch {
+      if (socialError) throw socialError;
       throw directError instanceof Error
         ? directError
         : new Error("Não foi possível capturar automaticamente a imagem do anúncio.");
     }
   }
 }
+
