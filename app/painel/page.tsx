@@ -3,6 +3,11 @@ import { ArrowUpRight, CalendarDays, Plus, Settings2 } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
 
+function formatAge(age: number) {
+  const value = Math.max(1, Math.round(Number(age) || 1));
+  return `${value} ${value === 1 ? "ano" : "anos"}`;
+}
+
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase.from("invitations").select("*").order("created_at", { ascending: false });
@@ -43,7 +48,7 @@ export default async function DashboardPage() {
                   <span className="text-xs font-bold text-[#9a858a]">{invitation.event_date ? new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR") : "Sem data"}</span>
                 </div>
                 <h2 className="mt-4 font-display text-2xl font-bold text-[#3a1d25]">{invitation.event_title}</h2>
-                <p className="mt-1 text-sm text-[#806e72]">{invitation.host_name} • {invitation.age} anos</p>
+                <p className="mt-1 text-sm text-[#806e72]">{invitation.host_name} • {formatAge(invitation.age)}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href={`/painel/convites/${invitation.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white"><Settings2 className="size-4" /> Editar</Link>
                   {invitation.status === "published" && (

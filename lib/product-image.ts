@@ -10,6 +10,17 @@ const PAGE_TIMEOUT_MS = 12_000;
 const IMAGE_TIMEOUT_MS = 15_000;
 
 type CapturedImage = { bytes: ArrayBuffer; contentType: string };
+type ImageCandidateSource =
+  | "product-json"
+  | "marketplace-cdn"
+  | "itemprop"
+  | "image-src"
+  | "hero-img"
+  | "og"
+  | "twitter"
+  | "generic-json";
+
+type ImageCandidate = { url: URL; source: ImageCandidateSource; score: number };
 
 function blockedIpv4(address: string) {
   const parts = address.split(".").map(Number);
@@ -76,6 +87,9 @@ async function fetchPublic(initialUrl: URL, init: RequestInit, timeoutMs: number
     let response: Response;
     try {
       response = await fetch(current, { ...init, cache: "no-store", redirect: "manual", signal: controller.signal });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") throw new Error("O site demorou demais para responder.");
+      throw new Error("Não foi possível acessar o link informado.");
     } finally {
       clearTimeout(timer);
     }
@@ -106,7 +120,9 @@ function decodeHtml(value: string) {
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+    .replace(/&gt;/gi, ">")
+    .replace(/\\u002F/gi, "/")
+    .replace(/\\\//g, "/");
 }
 
 function attribute(tag: string, name: string) {
@@ -114,47 +130,117 @@ function attribute(tag: string, name: string) {
   return decodeHtml((match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim());
 }
 
-function jsonLdImage(value: unknown): string | null {
-  if (!value) return null;
-  if (typeof value === "string") return value;
+function recordTypeIsProduct(record: Record<string, unknown>) {
+  const value = record["@type"];
+  if (typeof value === "string") return value.toLowerCase() === "product";
+  if (Array.isArray(value)) return value.some((item) => typeof item === "string" && item.toLowerCase() === "product");
+  return false;
+}
+
+function imageStrings(value: unknown): string[] {
+  if (!value) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(imageStrings);
+  if (typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const direct = record.url ?? record.contentUrl;
+  return typeof direct === "string" ? [direct] : [];
+}
+
+function collectJsonLdImages(value: unknown, productOnly: boolean, output: string[]) {
+  if (!value) return;
   if (Array.isArray(value)) {
-    for (const item of value) {
-      const result = jsonLdImage(item);
-      if (result) return result;
-    }
+    value.forEach((item) => collectJsonLdImages(item, productOnly, output));
+    return;
+  }
+  if (typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  const isProduct = recordTypeIsProduct(record);
+  if ((!productOnly || isProduct) && record.image) output.push(...imageStrings(record.image));
+
+  for (const nested of Object.values(record)) {
+    if (nested && typeof nested === "object") collectJsonLdImages(nested, productOnly, output);
+  }
+}
+
+function marketplaceProductScore(url: URL) {
+  const host = url.hostname.toLowerCase();
+  const path = decodeURIComponent(url.pathname).toLowerCase();
+
+  if (host.endsWith("mlstatic.com")) {
+    if (/d_(?:nq|q)_np/i.test(url.pathname) || /d_[a-z]{1,4}_np/i.test(url.pathname)) return 120;
+    if (path.includes("frontend-assets") || path.includes("navigation") || path.includes("logo")) return -140;
+    return 20;
+  }
+
+  if (host.endsWith("susercontent.com") || host.includes("shopee")) {
+    if (path.includes("/file/") || host.endsWith("img.susercontent.com")) return 110;
+    if (/logo|favicon|sprite|icon/.test(path)) return -120;
+    return 15;
+  }
+
+  return 0;
+}
+
+function genericAssetPenalty(url: URL) {
+  const value = `${url.hostname}${url.pathname}`.toLowerCase();
+  return /favicon|sprite|placeholder|default[_-]?image|brand[_-]?logo|site[_-]?logo|social[_-]?share|handshake|navigation|header[_-]?logo/.test(value)
+    ? -140
+    : 0;
+}
+
+function sourceBaseScore(source: ImageCandidateSource) {
+  switch (source) {
+    case "product-json": return 150;
+    case "marketplace-cdn": return 135;
+    case "itemprop": return 115;
+    case "hero-img": return 100;
+    case "image-src": return 90;
+    case "og": return 75;
+    case "twitter": return 65;
+    case "generic-json": return 55;
+  }
+}
+
+function createCandidate(raw: string, source: ImageCandidateSource, pageUrl: URL): ImageCandidate | null {
+  try {
+    const url = new URL(decodeHtml(raw), pageUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return {
+      url,
+      source,
+      score: sourceBaseScore(source) + marketplaceProductScore(url) + genericAssetPenalty(url),
+    };
+  } catch {
     return null;
   }
-  if (typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  const direct = record.image;
-  if (typeof direct === "string") return direct;
-  if (Array.isArray(direct)) {
-    for (const item of direct) {
-      if (typeof item === "string") return item;
-      if (item && typeof item === "object") {
-        const entry = item as Record<string, unknown>;
-        const candidate = entry.url ?? entry.contentUrl;
-        if (typeof candidate === "string") return candidate;
-      }
+}
+
+function addKnownMarketplaceCandidates(html: string, pageUrl: URL, candidates: ImageCandidate[]) {
+  const normalized = decodeHtml(html);
+
+  const absoluteImagePattern = /https?:\/\/[^\s"'<>\\]+/gi;
+  for (const rawMatch of normalized.match(absoluteImagePattern) ?? []) {
+    if (!/(?:mlstatic\.com|susercontent\.com)/i.test(rawMatch)) continue;
+    const clean = rawMatch.replace(/[),}\]]+$/, "");
+    const candidate = createCandidate(clean, "marketplace-cdn", pageUrl);
+    if (candidate) candidates.push(candidate);
+  }
+
+  if (pageUrl.hostname.toLowerCase().includes("shopee")) {
+    const imageIdPattern = /["'](?:image|image_id)["']\s*:\s*["']([a-z0-9_-]{20,})(?:@[^"']*)?["']/gi;
+    let match: RegExpExecArray | null;
+    while ((match = imageIdPattern.exec(normalized))) {
+      const id = match[1];
+      const candidate = createCandidate(`https://down-br.img.susercontent.com/file/${id}`, "marketplace-cdn", pageUrl);
+      if (candidate) candidates.push(candidate);
     }
   }
-  if (direct && typeof direct === "object") {
-    const entry = direct as Record<string, unknown>;
-    const candidate = entry.url ?? entry.contentUrl;
-    if (typeof candidate === "string") return candidate;
-  }
-  for (const nested of Object.values(record)) {
-    if (nested && typeof nested === "object") {
-      const result = jsonLdImage(nested);
-      if (result) return result;
-    }
-  }
-  return null;
 }
 
 function extractImageUrl(html: string, pageUrl: URL) {
-  const candidates: string[] = [];
-  const priorities = ["og:image:secure_url", "og:image:url", "og:image", "twitter:image:src", "twitter:image"];
+  const candidates: ImageCandidate[] = [];
   const meta = new Map<string, string>();
 
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
@@ -162,36 +248,85 @@ function extractImageUrl(html: string, pageUrl: URL) {
     const content = attribute(tag, "content");
     if (key && content && !meta.has(key)) meta.set(key, content);
   }
-  for (const key of priorities) {
-    const value = meta.get(key);
-    if (value) candidates.push(value);
+
+  for (const script of html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? []) {
+    const text = script.replace(/^<script\b[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
+    try {
+      const parsed = JSON.parse(text);
+      const productImages: string[] = [];
+      collectJsonLdImages(parsed, true, productImages);
+      productImages.forEach((image) => {
+        const candidate = createCandidate(image, "product-json", pageUrl);
+        if (candidate) candidates.push(candidate);
+      });
+
+      if (productImages.length === 0) {
+        const genericImages: string[] = [];
+        collectJsonLdImages(parsed, false, genericImages);
+        genericImages.forEach((image) => {
+          const candidate = createCandidate(image, "generic-json", pageUrl);
+          if (candidate) candidates.push(candidate);
+        });
+      }
+    } catch {
+      // Continua com as outras fontes da página.
+    }
+  }
+
+  const itempropImage = meta.get("image");
+  if (itempropImage) {
+    const candidate = createCandidate(itempropImage, "itemprop", pageUrl);
+    if (candidate) candidates.push(candidate);
   }
 
   for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
     const rel = attribute(tag, "rel").toLowerCase();
     const href = attribute(tag, "href");
-    if (rel.split(/\s+/).includes("image_src") && href) candidates.push(href);
-  }
-
-  for (const script of html.match(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi) ?? []) {
-    const text = script.replace(/^<script\b[^>]*>/i, "").replace(/<\/script>$/i, "").trim();
-    try {
-      const candidate = jsonLdImage(JSON.parse(text));
+    if (rel.split(/\s+/).includes("image_src") && href) {
+      const candidate = createCandidate(href, "image-src", pageUrl);
       if (candidate) candidates.push(candidate);
-    } catch {
-      // Open Graph ainda poderá fornecer a imagem.
     }
   }
 
-  for (const candidate of candidates) {
-    try {
-      const url = new URL(decodeHtml(candidate), pageUrl);
-      if (url.protocol === "http:" || url.protocol === "https:") return url;
-    } catch {
-      // Tenta o próximo candidato.
+  for (const tag of html.match(/<img\b[^>]*>/gi) ?? []) {
+    const src = attribute(tag, "src") || attribute(tag, "data-src") || attribute(tag, "data-original");
+    if (!src) continue;
+    const fetchPriority = attribute(tag, "fetchpriority").toLowerCase();
+    const candidate = createCandidate(src, "hero-img", pageUrl);
+    if (candidate) {
+      if (fetchPriority === "high") candidate.score += 20;
+      candidates.push(candidate);
     }
   }
-  throw new Error("O anúncio não informou uma imagem principal.");
+
+  addKnownMarketplaceCandidates(html, pageUrl, candidates);
+
+  for (const key of ["og:image:secure_url", "og:image:url", "og:image"]) {
+    const value = meta.get(key);
+    if (!value) continue;
+    const candidate = createCandidate(value, "og", pageUrl);
+    if (candidate) candidates.push(candidate);
+  }
+
+  for (const key of ["twitter:image:src", "twitter:image"]) {
+    const value = meta.get(key);
+    if (!value) continue;
+    const candidate = createCandidate(value, "twitter", pageUrl);
+    if (candidate) candidates.push(candidate);
+  }
+
+  const unique = new Map<string, ImageCandidate>();
+  for (const candidate of candidates) {
+    const key = candidate.url.toString();
+    const previous = unique.get(key);
+    if (!previous || candidate.score > previous.score) unique.set(key, candidate);
+  }
+
+  const ranked = [...unique.values()].sort((a, b) => b.score - a.score);
+  const best = ranked.find((candidate) => candidate.score > 0);
+  if (best) return best.url;
+
+  throw new Error("O anúncio não informou uma imagem principal de produto que pudesse ser capturada.");
 }
 
 function detectImageType(bytes: ArrayBuffer, header: string) {
@@ -203,6 +338,7 @@ function detectImageType(bytes: ArrayBuffer, header: string) {
   if (view.length >= 8 && view[0] === 0x89 && view[1] === 0x50 && view[2] === 0x4e && view[3] === 0x47) return "image/png";
   if (view.length >= 12 && new TextDecoder().decode(view.slice(0, 4)) === "RIFF" && new TextDecoder().decode(view.slice(8, 12)) === "WEBP") return "image/webp";
   if (view.length >= 6 && new TextDecoder().decode(view.slice(0, 6)).startsWith("GIF8")) return "image/gif";
+  if (view.length >= 12 && new TextDecoder().decode(view.slice(4, 8)) === "ftyp" && ["avif", "avis"].includes(new TextDecoder().decode(view.slice(8, 12)))) return "image/avif";
   return "";
 }
 
@@ -263,6 +399,12 @@ async function viaMicrolink(rawUrl: string): Promise<CapturedImage> {
   const address = typeof value === "string" ? value : value?.url;
   if (!address) throw new Error("O anúncio não disponibilizou uma imagem principal.");
   const imageUrl = new URL(address, productUrl);
+
+  // Evita gravar logos institucionais retornados por páginas bloqueadas de marketplaces.
+  if (marketplaceProductScore(imageUrl) + genericAssetPenalty(imageUrl) < 0) {
+    throw new Error("O anúncio retornou apenas uma imagem institucional, não a foto do produto.");
+  }
+
   return downloadImage(imageUrl, productUrl.toString());
 }
 

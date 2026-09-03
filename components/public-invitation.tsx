@@ -14,6 +14,11 @@ function mercadoLivreSearch(name: string) {
   return `https://lista.mercadolivre.com.br/${encodeURIComponent(name)}`;
 }
 
+function formatAge(age: number) {
+  const value = Math.max(1, Math.round(Number(age) || 1));
+  return `${value} ${value === 1 ? "ano" : "anos"}`;
+}
+
 export function PublicInvitation({ initialInvitation, initialGifts }: { initialInvitation: Invitation; initialGifts: GiftItem[] }) {
   const invitation = {
     ...initialInvitation,
@@ -113,7 +118,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
               <div className="grid h-full place-items-center text-7xl">{invitation.layout_key === "kids" ? "🎈" : "🎂"}</div>
             )}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent" />
-            <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[var(--i-accent)] shadow-sm backdrop-blur">{invitation.age} anos</span>
+            <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[var(--i-accent)] shadow-sm backdrop-blur">{formatAge(invitation.age)}</span>
           </div>
 
           <div className={`px-6 py-8 sm:px-10 sm:py-11 ${invitation.layout_key === "modern" ? "text-left" : "text-center"}`}>

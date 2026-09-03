@@ -27,6 +27,11 @@ type Tab = "content" | "appearance" | "photo" | "gifts" | "responses";
 const PHOTO_ZOOM_MIN = 1;
 const PHOTO_ZOOM_MAX = 2.5;
 
+function formatAge(age: number) {
+  const value = Math.max(1, Math.round(Number(age) || 1));
+  return `${value} ${value === 1 ? "ano" : "anos"}`;
+}
+
 export function InvitationEditor({
   initialInvitation,
   initialGifts,
@@ -231,17 +236,21 @@ export function InvitationEditor({
       return;
     }
 
-    if (suggestionUrl && !gift.manual_image_url && !suggestionImageUrl) {
+    if (suggestionUrl && !gift.manual_image_url) {
       try {
-        suggestionImageUrl = await captureAndStoreSuggestionImage(gift.id, suggestionUrl);
-        if (suggestionImageUrl) {
-          const { error } = await supabase.from("gifts").update({ suggestion_image_url: suggestionImageUrl }).eq("id", gift.id);
+        const capturedImageUrl = await captureAndStoreSuggestionImage(gift.id, suggestionUrl);
+        if (capturedImageUrl) {
+          suggestionImageUrl = capturedImageUrl;
+          const { error } = await supabase.from("gifts").update({ suggestion_image_url: capturedImageUrl }).eq("id", gift.id);
           if (error) throw new Error(error.message);
-          setGifts((items) => items.map((item) => item.id === gift.id ? { ...item, suggestion_image_url: suggestionImageUrl } : item));
-          setMessage(`Presente "${gift.name}" salvo com imagem do anúncio.`);
+          setGifts((items) => items.map((item) => item.id === gift.id ? { ...item, suggestion_image_url: capturedImageUrl } : item));
+          setMessage(`Presente "${gift.name}" salvo com a imagem atualizada do anúncio.`);
         }
       } catch (captureError) {
-        setMessage(captureError instanceof Error ? `Presente salvo. ${captureError.message}` : "Presente salvo sem imagem automática.");
+        const detail = captureError instanceof Error ? captureError.message : "Não foi possível capturar a imagem automática.";
+        setMessage(suggestionImageUrl
+          ? `Presente salvo. Não foi possível atualizar a imagem do anúncio; a imagem anterior foi mantida. ${detail}`
+          : `Presente salvo. ${detail}`);
       }
     } else {
       setMessage(`Presente "${gift.name}" salvo.`);
@@ -521,7 +530,7 @@ function MiniPreview({ invitation }: { invitation: Invitation }) {
       <div className={`px-6 py-7 sm:px-10 ${invitation.layout_key === "modern" ? "text-left" : "text-center"}`}>
         <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[var(--p-accent)]">Você está convidado</p>
         <h3 className="mt-2 font-display text-3xl font-bold text-[var(--p-text)] sm:text-4xl">{invitation.event_title || "Seu aniversário"}</h3>
-        <p className="mt-2 text-sm font-semibold text-[var(--p-muted)]">{invitation.age} anos {invitation.event_date ? `• ${new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR")}` : ""}</p>
+        <p className="mt-2 text-sm font-semibold text-[var(--p-muted)]">{formatAge(invitation.age)} {invitation.event_date ? `• ${new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR")}` : ""}</p>
         <p className={`mt-4 text-sm leading-6 text-[var(--p-muted)] ${invitation.layout_key === "modern" ? "max-w-2xl" : "mx-auto max-w-2xl"}`}>{invitation.invitation_text}</p>
       </div>
     </div>
