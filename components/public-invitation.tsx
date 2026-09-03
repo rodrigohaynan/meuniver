@@ -240,8 +240,11 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
 function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
   const [storedFailed, setStoredFailed] = useState(false);
   const [proxyFailed, setProxyFailed] = useState(false);
-  const storedUrl = gift.manual_image_url || gift.suggestion_image_url;
-  const proxyUrl = gift.suggestion_url ? `/api/product-image/${encodeURIComponent(gift.id)}?url=${encodeURIComponent(gift.suggestion_url)}` : null;
+  const storedSuggestion = gift.suggestion_image_url?.includes("/storage/v1/object/public/invite-media/")
+    ? gift.suggestion_image_url
+    : null;
+  const storedUrl = gift.manual_image_url || storedSuggestion;
+  const proxyUrl = gift.suggestion_url ? `/api/product-image/${encodeURIComponent(gift.id)}?url=${encodeURIComponent(gift.suggestion_url)}&t=public` : null;
   const src = storedUrl && !storedFailed ? storedUrl : proxyUrl && !proxyFailed ? proxyUrl : null;
 
   if (!src) {

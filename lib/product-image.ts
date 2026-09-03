@@ -555,6 +555,69 @@ async function direct(rawUrl: string): Promise<CapturedImage> {
   return downloadImage(imageUrl, page.finalUrl.toString());
 }
 
+
+async function viaJinaReader(rawUrl: string): Promise<CapturedImage> {
+  const productUrl = new URL(rawUrl);
+  await assertPublic(productUrl);
+
+  const readerUrl = new URL(`https://r.jina.ai/${productUrl.toString()}`);
+  const reader = await fetchPublic(
+    readerUrl,
+    {
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/plain,text/markdown;q=0.9,*/*;q=0.8",
+        "x-engine": "browser",
+        "x-no-cache": "true",
+      },
+    },
+    28_000,
+  );
+
+  if (!reader.response.ok) {
+    await reader.response.body?.cancel().catch(() => undefined);
+    throw new Error(`A leitura renderizada do anúncio respondeu com erro (${reader.response.status}).`);
+  }
+
+  const markdown = new TextDecoder().decode(await readLimited(reader.response, 4_000_000));
+  const candidates: ImageCandidate[] = [];
+
+  const markdownImagePattern = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = markdownImagePattern.exec(markdown))) {
+    const candidate = createCandidate(match[1], "marketplace-cdn", productUrl);
+    if (candidate) candidates.push(candidate);
+  }
+
+  const absoluteImagePattern = /https?:\/\/[^\s)\]}'"<>]+/gi;
+  for (const raw of markdown.match(absoluteImagePattern) ?? []) {
+    if (!/(?:mlstatic\.com|susercontent\.com)/i.test(raw)) continue;
+    const candidate = createCandidate(raw.replace(/[.,;:]+$/, ""), "marketplace-cdn", productUrl);
+    if (candidate) candidates.push(candidate);
+  }
+
+  const unique = new Map<string, ImageCandidate>();
+  for (const candidate of candidates) {
+    const key = candidate.url.toString();
+    const previous = unique.get(key);
+    if (!previous || candidate.score > previous.score) unique.set(key, candidate);
+  }
+
+  const ranked = [...unique.values()]
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  for (const candidate of ranked.slice(0, 12)) {
+    try {
+      return await downloadImage(candidate.url, productUrl.toString());
+    } catch {
+      // Tenta a próxima imagem encontrada na página renderizada.
+    }
+  }
+
+  throw new Error("A página renderizada não revelou uma foto válida do produto.");
+}
+
 async function viaMicrolink(rawUrl: string): Promise<CapturedImage> {
   const productUrl = new URL(rawUrl);
   await assertPublic(productUrl);
@@ -585,23 +648,40 @@ async function viaMicrolink(rawUrl: string): Promise<CapturedImage> {
 }
 
 export async function captureProductImage(rawUrl: string): Promise<CapturedImage> {
-  let normalized: string;
+  let parsed: URL;
   try {
-    normalized = new URL(rawUrl).toString();
+    parsed = new URL(rawUrl);
   } catch {
     throw new Error("O link de sugestão é inválido.");
   }
+  const normalized = parsed.toString();
+  const mercadoLivre = isMercadoLivreHost(parsed.hostname);
 
   const mercadoLivreImage = await viaMercadoLivreApi(normalized).catch(() => null);
   if (mercadoLivreImage) return mercadoLivreImage;
 
+  let directError: unknown;
   try {
     return await direct(normalized);
-  } catch (directError) {
-    try {
-      return await viaMicrolink(normalized);
-    } catch {
-      throw directError instanceof Error ? directError : new Error("Não foi possível capturar a imagem do anúncio.");
+  } catch (error) {
+    directError = error;
+  }
+
+  try {
+    return await viaJinaReader(normalized);
+  } catch (readerError) {
+    // No Mercado Livre não aceitamos o Microlink como imagem final, porque em
+    // páginas bloqueadas ele pode devolver a arte institucional do marketplace.
+    if (mercadoLivre) {
+      const directMessage = directError instanceof Error ? directError.message : "captura direta indisponível";
+      const readerMessage = readerError instanceof Error ? readerError.message : "leitura renderizada indisponível";
+      throw new Error(`Não foi possível obter a foto real do produto. ${directMessage} ${readerMessage}`);
     }
+  }
+
+  try {
+    return await viaMicrolink(normalized);
+  } catch {
+    throw directError instanceof Error ? directError : new Error("Não foi possível capturar a imagem do anúncio.");
   }
 }

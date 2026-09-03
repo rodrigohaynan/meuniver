@@ -147,18 +147,36 @@ export function InvitationEditor({
     if (!cleanUrl) return null;
 
     const response = await fetch(
-      `/api/product-image/${encodeURIComponent(giftId)}?url=${encodeURIComponent(cleanUrl)}&format=json&t=${Date.now()}`,
+      `/api/product-image/${encodeURIComponent(giftId)}?url=${encodeURIComponent(cleanUrl)}&t=${Date.now()}`,
       { cache: "no-store" },
     );
 
-    const result = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
-    if (!response.ok || !result?.imageUrl) {
-      throw new Error(result?.error || "Não foi possível localizar a imagem principal desse anúncio.");
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => "")).trim();
+      throw new Error(detail || "Não foi possível localizar a imagem principal desse anúncio.");
     }
 
-    // Nesta fase de testes guardamos a URL resolvida da imagem. Isso evita uma
-    // segunda requisição/download que vinha falhando em marketplaces como Mercado Livre.
-    return result.imageUrl;
+    const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || "";
+    if (!contentType.startsWith("image/")) {
+      throw new Error("O anúncio respondeu sem uma imagem válida.");
+    }
+
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("A imagem capturada veio vazia.");
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Sessão expirada. Entre novamente para importar a imagem.");
+
+    const extension = safeExtension(contentType, `produto.${contentType.split("/")[1] || "jpg"}`);
+    const path = `${user.id}/${invitation.id}/gift-${giftId}-suggestion-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from("invite-media").upload(path, blob, {
+      upsert: false,
+      contentType,
+    });
+    if (uploadError) throw new Error(`Imagem encontrada, mas não foi possível armazená-la: ${uploadError.message}`);
+
+    const { data } = supabase.storage.from("invite-media").getPublicUrl(path);
+    return data.publicUrl;
   }
 
   async function addGift() {
@@ -539,8 +557,11 @@ function GiftImagePreview({ gift }: { gift: GiftItem }) {
     setProxyFailed(false);
   }, [gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url]);
 
-  const stored = gift.manual_image_url || gift.suggestion_image_url;
-  const proxy = gift.suggestion_url ? `/api/product-image/${encodeURIComponent(gift.id)}?url=${encodeURIComponent(gift.suggestion_url)}` : null;
+  const storedSuggestion = gift.suggestion_image_url?.includes("/storage/v1/object/public/invite-media/")
+    ? gift.suggestion_image_url
+    : null;
+  const stored = gift.manual_image_url || storedSuggestion;
+  const proxy = gift.suggestion_url ? `/api/product-image/${encodeURIComponent(gift.id)}?url=${encodeURIComponent(gift.suggestion_url)}&t=preview` : null;
   const src = stored && !storedFailed ? stored : proxy && !proxyFailed ? proxy : null;
 
   return (
