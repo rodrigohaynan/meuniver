@@ -308,12 +308,95 @@ function detectedImageType(bytes: Uint8Array, headerType: string) {
   return "";
 }
 
+
+
+function mercadoLivreItemId(url: URL) {
+  const sources = [
+    url.searchParams.get("wid") ?? "",
+    url.searchParams.get("item_id") ?? "",
+    url.searchParams.get("pdp_filters") ?? "",
+    decodeURIComponent(url.hash.slice(1)),
+    url.pathname,
+  ];
+
+  for (const source of sources) {
+    const match = source.match(/\bMLB[-:]?(\d{8,})\b/i);
+    if (match) return `MLB-${match[1]}`;
+  }
+  return "";
+}
+
+function mercadoLivreSlug(url: URL) {
+  const firstSegment = url.pathname.split("/").filter(Boolean)[0] ?? "";
+  if (!firstSegment || /^(?:MLB[-]?\d+|p|up)$/i.test(firstSegment)) return "";
+  return firstSegment
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 180);
+}
+
+function mercadoLivreCanonicalCandidate(url: URL) {
+  const hostname = url.hostname.toLowerCase();
+  if (!(hostname === "mercadolivre.com.br" || hostname.endsWith(".mercadolivre.com.br"))) return null;
+  if (hostname === "produto.mercadolivre.com.br") return null;
+
+  const itemId = mercadoLivreItemId(url);
+  if (!itemId) return null;
+
+  const slug = mercadoLivreSlug(url);
+  const path = slug ? `${itemId}-${slug}-_JM` : `${itemId}-_JM`;
+  return new URL(`https://produto.mercadolivre.com.br/${path}`);
+}
+
+function looksLikeDirectImageUrl(url: URL) {
+  return /\.(?:jpe?g|png|webp|gif|avif)(?:$|[?#])/i.test(url.toString());
+}
+
+async function captureDirectImageUrl(imageUrl: URL): Promise<CapturedProductImage> {
+  const image = await fetchPublic(
+    imageUrl,
+    {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    },
+    IMAGE_TIMEOUT_MS,
+  );
+
+  if (!image.response.ok) {
+    await image.response.body?.cancel().catch(() => undefined);
+    throw new Error(`A imagem respondeu com erro (${image.response.status}).`);
+  }
+
+  const imageBytes = await readLimited(image.response, MAX_IMAGE_BYTES);
+  const contentType = detectedImageType(imageBytes, image.response.headers.get("content-type") ?? "");
+  if (!contentType) throw new Error("O endereço informado não retornou uma imagem válida.");
+
+  const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
+  new Uint8Array(imageBuffer).set(imageBytes);
+
+  return {
+    blob: new Blob([imageBuffer], { type: contentType }),
+    sourceUrl: image.finalUrl.toString(),
+  };
+}
+
 async function captureProductImageDirect(rawUrl: string): Promise<CapturedProductImage> {
   let productUrl: URL;
   try {
     productUrl = new URL(rawUrl);
   } catch {
     throw new Error("O link de sugestão é inválido.");
+  }
+
+  if (looksLikeDirectImageUrl(productUrl)) {
+    return captureDirectImageUrl(productUrl);
   }
 
   const page = await fetchPublic(
@@ -334,6 +417,18 @@ async function captureProductImageDirect(rawUrl: string): Promise<CapturedProduc
     throw new Error(`O anúncio respondeu com erro (${page.response.status}).`);
   }
   const pageType = page.response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (pageType.startsWith("image/")) {
+    const imageBytes = await readLimited(page.response, MAX_IMAGE_BYTES);
+    const contentType = detectedImageType(imageBytes, pageType);
+    if (!contentType) throw new Error("O endereço informado não retornou uma imagem válida.");
+
+    const imageBuffer = new ArrayBuffer(imageBytes.byteLength);
+    new Uint8Array(imageBuffer).set(imageBytes);
+    return {
+      blob: new Blob([imageBuffer], { type: contentType }),
+      sourceUrl: page.finalUrl.toString(),
+    };
+  }
   if (pageType && !pageType.includes("text/html") && !pageType.includes("application/xhtml+xml")) {
     await page.response.body?.cancel().catch(() => undefined);
     throw new Error("O link não parece apontar para uma página de produto.");
@@ -461,11 +556,28 @@ async function captureProductImageViaMicrolink(rawUrl: string): Promise<Captured
 }
 
 export async function captureProductImageFromUrl(rawUrl: string): Promise<CapturedProductImage> {
+  let originalUrl: URL | null = null;
+  try {
+    originalUrl = new URL(rawUrl);
+  } catch {
+    // A função direta devolverá a mensagem padronizada de link inválido.
+  }
+
+  const canonicalCandidate = originalUrl ? mercadoLivreCanonicalCandidate(originalUrl) : null;
+  if (canonicalCandidate) {
+    try {
+      return await captureProductImageDirect(canonicalCandidate.toString());
+    } catch {
+      // Links longos do Mercado Livre nem sempre aceitam a URL reconstruída.
+      // Nesse caso continuamos com o link original e os fallbacks já existentes.
+    }
+  }
+
   try {
     return await captureProductImageDirect(rawUrl);
   } catch (directError) {
     try {
-      return await captureProductImageViaMicrolink(rawUrl);
+      return await captureProductImageViaMicrolink(canonicalCandidate?.toString() ?? rawUrl);
     } catch {
       throw directError instanceof Error
         ? directError
