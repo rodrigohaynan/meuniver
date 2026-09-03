@@ -5,8 +5,8 @@ MVP baseado nos conceitos do convite da Liene, transformado em uma plataforma pa
 ## O que já está incluído
 
 - Splash/landing page.
-- Cadastro e login por e-mail e senha.
-- Login com Google e Facebook via Supabase Auth.
+- Cadastro e login por e-mail e senha via Supabase Auth.
+- Google, Facebook, telefone/SMS e demais provedores externos desativados nesta fase de testes.
 - Painel "Meus convites".
 - Criação de vários convites por usuário.
 - Modelos adulto e infantil.
@@ -27,13 +27,18 @@ MVP baseado nos conceitos do convite da Liene, transformado em uma plataforma pa
 
 ## 1. Criar o projeto Supabase
 
-1. Crie um projeto em https://supabase.com.
+1. Crie um projeto no Supabase.
 2. Abra `SQL Editor`.
 3. Execute o arquivo `supabase/schema.sql`.
 4. Em Authentication > URL Configuration:
    - Site URL: URL do seu site.
    - Redirect URLs: adicione `https://SEU-SITE/auth/callback` e `http://localhost:3000/auth/callback`.
-5. Em Authentication > Providers, habilite Google e Facebook e informe as credenciais de cada provedor.
+5. Em Authentication > Providers, deixe somente **Email** ativado para o MVP.
+6. Deixe Google, Facebook, Phone/SMS e demais provedores externos desativados.
+
+### Testes sem serviço de e-mail externo
+
+Durante os primeiros testes, é possível desativar temporariamente a exigência de confirmação de e-mail no Supabase. Isso permite criar contas e entrar imediatamente apenas com e-mail e senha. Para uso público, a recomendação é reativar a confirmação e configurar um serviço de envio de e-mail apropriado.
 
 ## 2. Variáveis no Netlify
 
@@ -55,9 +60,9 @@ npm run dev
 
 No Netlify, conecte o repositório e faça o deploy normalmente. O projeto usa Next.js 16 e Node 22.
 
-## Observação importante sobre login social
+## Login social
 
-O código dos botões Google/Facebook já está pronto. Eles só funcionarão depois que os provedores forem habilitados no painel do Supabase e as credenciais OAuth forem cadastradas.
+A plataforma foi estruturada para permitir provedores sociais no futuro, mas eles ficam desativados na fase de testes para manter o MVP sem custos e sem dependências externas desnecessárias.
 
 ## Nome
 

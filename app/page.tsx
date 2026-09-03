@@ -37,7 +37,7 @@ export default function HomePage() {
               Ver recursos
             </a>
           </div>
-          <p className="mt-4 text-sm text-[#8b777c]">Comece com e-mail, Google ou Facebook.</p>
+          <p className="mt-4 text-sm text-[#8b777c]">Comece grátis com e-mail e senha.</p>
         </div>
 
         <div className="relative">

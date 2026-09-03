@@ -10,7 +10,7 @@ export function AuthCard() {
   const [mode, setMode] = useState<"login" | "signup">(searchParams.get("modo") === "cadastro" ? "signup" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState<"email" | "google" | "facebook" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   const supabase = createClient();
@@ -18,7 +18,7 @@ export function AuthCard() {
   async function submitEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
-    setBusy("email");
+    setBusy(true);
     setMessage("");
 
     try {
@@ -40,23 +40,7 @@ export function AuthCard() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível entrar.");
     } finally {
-      setBusy(null);
-    }
-  }
-
-  async function social(provider: "google" | "facebook") {
-    if (busy) return;
-    setBusy(provider);
-    setMessage("");
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/painel`,
-      },
-    });
-    if (error) {
-      setMessage(error.message);
-      setBusy(null);
+      setBusy(false);
     }
   }
 
@@ -75,25 +59,14 @@ export function AuthCard() {
         {mode === "login" ? "Bem-vindo de volta" : "Crie seu primeiro convite"}
       </h1>
       <p className="mt-2 text-sm leading-6 text-[#7c686d]">
-        {mode === "login" ? "Entre para editar seus convites e acompanhar respostas." : "Seu painel fica separado e protegido por usuário."}
+        {mode === "login" ? "Entre com seu e-mail e senha para acessar seus convites." : "Crie sua conta gratuitamente com e-mail e senha."}
       </p>
 
-      <div className="mt-6 grid gap-3">
-        <button type="button" onClick={() => void social("google")} disabled={Boolean(busy)} className="flex h-12 items-center justify-center gap-3 rounded-xl border border-[#d9cbc3] bg-white font-bold text-[#4f4044] transition hover:bg-[#fffaf7] disabled:opacity-60">
-          <span className="grid size-6 place-items-center rounded-full border text-xs font-black">G</span>
-          {busy === "google" ? "Abrindo Google…" : "Continuar com Google"}
-        </button>
-        <button type="button" onClick={() => void social("facebook")} disabled={Boolean(busy)} className="flex h-12 items-center justify-center gap-3 rounded-xl border border-[#d9cbc3] bg-white font-bold text-[#4f4044] transition hover:bg-[#fffaf7] disabled:opacity-60">
-          <span className="grid size-6 place-items-center rounded-full bg-[#1877f2] text-xs font-black text-white">f</span>
-          {busy === "facebook" ? "Abrindo Facebook…" : "Continuar com Facebook"}
-        </button>
+      <div className="mt-5 rounded-2xl border border-[#eaded7] bg-[#fffaf7] px-4 py-3 text-sm leading-5 text-[#725f63]">
+        Nesta fase de testes, o acesso por Google, Facebook, telefone e outros provedores externos está desativado. Eles poderão ser habilitados depois sem alterar seus convites.
       </div>
 
-      <div className="my-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[.12em] text-[#aa999d]">
-        <span className="h-px flex-1 bg-[#eaded7]" /> ou <span className="h-px flex-1 bg-[#eaded7]" />
-      </div>
-
-      <form onSubmit={submitEmail} className="space-y-4">
+      <form onSubmit={submitEmail} className="mt-6 space-y-4">
         <label className="block">
           <span className="text-sm font-bold text-[#594147]">E-mail</span>
           <div className="mt-2 flex h-12 items-center gap-2 rounded-xl border border-[#d9cbc3] bg-white px-3 focus-within:border-[#a96b7b] focus-within:ring-2 focus-within:ring-[#a96b7b]/15">
@@ -108,8 +81,8 @@ export function AuthCard() {
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} autoComplete={mode === "signup" ? "new-password" : "current-password"} className="min-w-0 flex-1 outline-none" placeholder="••••••••" />
           </div>
         </label>
-        <button disabled={Boolean(busy)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f37] font-bold text-white transition hover:bg-[#64172b] disabled:opacity-60">
-          {busy === "email" && <Loader2 className="size-4 animate-spin" />}
+        <button disabled={busy} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f37] font-bold text-white transition hover:bg-[#64172b] disabled:opacity-60">
+          {busy && <Loader2 className="size-4 animate-spin" />}
           {mode === "login" ? "Entrar no painel" : "Criar minha conta"}
         </button>
       </form>

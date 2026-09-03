@@ -4,9 +4,10 @@
 
 **Autenticação**
 - Supabase Auth.
-- E-mail e senha.
-- Google OAuth.
-- Facebook OAuth.
+- E-mail e senha ativados.
+- Google OAuth desativado nesta fase.
+- Facebook OAuth desativado nesta fase.
+- Telefone/SMS e demais provedores externos desativados.
 - Sessão protegida por cookies SSR.
 
 **Dados**
@@ -60,11 +61,18 @@
    - Lista de mesas.
    - Check-in por QR Code.
    - Lembrete automático.
-   - Mensagens no WhatsApp.
+   - Mensagens no WhatsApp, apenas quando houver integração com custo/consentimento definidos.
    - Lista de presentes com PIX opcional.
    - Álbum colaborativo após a festa.
 
-6. **Outros eventos**
+6. **Provedores de login futuros**
+   - Google.
+   - Facebook.
+   - Apple.
+   - Telefone/SMS.
+   - Habilitar somente quando houver necessidade real, configuração concluída e custo conhecido.
+
+7. **Outros eventos**
    - Casamento.
    - Chá revelação.
    - Chá de bebê.

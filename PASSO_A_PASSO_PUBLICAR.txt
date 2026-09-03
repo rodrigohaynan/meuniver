@@ -1,4 +1,4 @@
-MEU CONVITE — PASSO A PASSO PARA PUBLICAR
+MEU CONVITE — PASSO A PASSO PARA PUBLICAR (FASE DE TESTES GRATUITA)
 
 1) CRIE UM NOVO PROJETO NO SUPABASE
    - Não use o banco do convite da Liene.
@@ -16,35 +16,38 @@ MEU CONVITE — PASSO A PASSO PARA PUBLICAR
    NEXT_PUBLIC_APP_URL
    NEXT_PUBLIC_APP_NAME
 
-4) LOGIN GOOGLE
-   Supabase > Authentication > Providers > Google.
-   Ative e informe Client ID e Client Secret do Google Cloud.
-   Configure a URL de callback exibida pelo próprio Supabase no Google Cloud.
+4) AUTENTICAÇÃO GRATUITA PARA O MVP
+   Supabase > Authentication > Providers:
+   - Email: ATIVADO.
+   - Google: DESATIVADO.
+   - Facebook: DESATIVADO.
+   - Phone/SMS: DESATIVADO.
+   - Apple, Azure, Discord e demais provedores externos: DESATIVADOS.
 
-5) LOGIN FACEBOOK
-   Supabase > Authentication > Providers > Facebook.
-   Ative e informe App ID e App Secret do Meta Developers.
-   Configure a URL de callback exibida pelo próprio Supabase.
+   Para testar sem depender de serviço de e-mail externo, você pode temporariamente
+   desativar a exigência de confirmação de e-mail no Supabase. Antes de abrir a
+   plataforma ao público, reative a confirmação e configure um serviço de e-mail adequado.
 
-6) URLS DE AUTENTICAÇÃO
+5) URLS DE AUTENTICAÇÃO
    Supabase > Authentication > URL Configuration:
    Site URL = https://SEU-SITE.netlify.app
    Redirect URLs:
    https://SEU-SITE.netlify.app/auth/callback
    http://localhost:3000/auth/callback
 
-7) GITHUB
+6) GITHUB
    Recomendado: criar um NOVO repositório para esta plataforma.
    Não substitua o repositório do convite da Liene enquanto ele estiver em uso.
 
-8) NETLIFY
+7) NETLIFY
    Conecte o novo repositório.
    Build command: npm run build
    O Netlify detectará Next.js.
    Node: 22.
 
-9) PRIMEIRO TESTE
-   - Criar conta.
+8) PRIMEIRO TESTE
+   - Criar conta por e-mail e senha.
+   - Fazer login.
    - Criar convite.
    - Escolher tema.
    - Enviar foto.
@@ -54,3 +57,7 @@ MEU CONVITE — PASSO A PASSO PARA PUBLICAR
    - Confirmar presença.
    - Reservar um presente.
    - Verificar que o dono enxerga as respostas no painel.
+
+PROVEDORES FUTUROS
+   Google, Facebook, telefone/SMS e outros métodos permanecem fora do MVP.
+   Eles podem ser habilitados depois, quando houver necessidade real e orçamento.
