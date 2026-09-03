@@ -146,37 +146,24 @@ export function InvitationEditor({
     const cleanUrl = suggestionUrl.trim();
     if (!cleanUrl) return null;
 
-    const response = await fetch(
-      `/api/product-image/${encodeURIComponent(giftId)}?url=${encodeURIComponent(cleanUrl)}&t=${Date.now()}`,
-      { cache: "no-store" },
-    );
-
-    if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).trim();
-      throw new Error(detail || "Não foi possível localizar a imagem principal desse anúncio.");
-    }
-
-    const contentType = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || "";
-    if (!contentType.startsWith("image/")) {
-      throw new Error("O anúncio respondeu sem uma imagem válida.");
-    }
-
-    const blob = await response.blob();
-    if (!blob.size) throw new Error("A imagem capturada veio vazia.");
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Sessão expirada. Entre novamente para importar a imagem.");
-
-    const extension = safeExtension(contentType, `produto.${contentType.split("/")[1] || "jpg"}`);
-    const path = `${user.id}/${invitation.id}/gift-${giftId}-suggestion-${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("invite-media").upload(path, blob, {
-      upsert: false,
-      contentType,
+    const response = await fetch("/api/gifts/capture-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ giftId, suggestionUrl: cleanUrl }),
+      cache: "no-store",
     });
-    if (uploadError) throw new Error(`Imagem encontrada, mas não foi possível armazená-la: ${uploadError.message}`);
 
-    const { data } = supabase.storage.from("invite-media").getPublicUrl(path);
-    return data.publicUrl;
+    const result = (await response.json().catch(() => ({}))) as {
+      imageUrl?: string;
+      error?: string;
+      warning?: string;
+    };
+
+    if (!response.ok || !result.imageUrl) {
+      throw new Error(result.error || result.warning || "Não foi possível capturar a imagem principal desse anúncio.");
+    }
+
+    return result.imageUrl;
   }
 
   async function addGift() {
@@ -549,34 +536,31 @@ function MiniPreview({ invitation }: { invitation: Invitation }) {
 }
 
 function GiftImagePreview({ gift }: { gift: GiftItem }) {
-  const [storedFailed, setStoredFailed] = useState(false);
-  const [proxyFailed, setProxyFailed] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    setStoredFailed(false);
-    setProxyFailed(false);
-  }, [gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url]);
+    setFailed(false);
+  }, [gift.manual_image_url, gift.suggestion_image_url]);
 
   const storedSuggestion = gift.suggestion_image_url?.includes("/storage/v1/object/public/invite-media/")
     ? gift.suggestion_image_url
     : null;
-  const stored = gift.manual_image_url || storedSuggestion;
-  const proxy = gift.suggestion_url ? `/api/product-image/${encodeURIComponent(gift.id)}?url=${encodeURIComponent(gift.suggestion_url)}&t=preview` : null;
-  const src = stored && !storedFailed ? stored : proxy && !proxyFailed ? proxy : null;
+  const src = gift.manual_image_url || storedSuggestion;
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-[#f6eee9]">
-      {src ? (
+      {src && !failed ? (
         <img
           key={src}
           src={src}
           alt={gift.name}
-          referrerPolicy="no-referrer"
           className="h-40 w-full object-contain"
-          onError={() => stored && !storedFailed ? setStoredFailed(true) : setProxyFailed(true)}
+          onError={() => setFailed(true)}
         />
       ) : <div className="grid h-40 place-items-center text-3xl">🎁</div>}
-      <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[#765f65]">{gift.manual_image_url ? "Foto manual" : src ? "Imagem do link" : "Sem imagem"}</span>
+      <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[#765f65]">
+        {gift.manual_image_url ? "Foto manual" : src && !failed ? "Imagem do link" : "Sem imagem"}
+      </span>
     </div>
   );
 }

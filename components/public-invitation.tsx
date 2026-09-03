@@ -238,16 +238,18 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
 }
 
 function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
-  const [storedFailed, setStoredFailed] = useState(false);
-  const [proxyFailed, setProxyFailed] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [gift.manual_image_url, gift.suggestion_image_url]);
+
   const storedSuggestion = gift.suggestion_image_url?.includes("/storage/v1/object/public/invite-media/")
     ? gift.suggestion_image_url
     : null;
-  const storedUrl = gift.manual_image_url || storedSuggestion;
-  const proxyUrl = gift.suggestion_url ? `/api/product-image/${encodeURIComponent(gift.id)}?url=${encodeURIComponent(gift.suggestion_url)}&t=public` : null;
-  const src = storedUrl && !storedFailed ? storedUrl : proxyUrl && !proxyFailed ? proxyUrl : null;
+  const src = gift.manual_image_url || storedSuggestion;
 
-  if (!src) {
+  if (!src || failed) {
     return <div className="relative grid aspect-[4/3] place-items-center bg-[var(--i-soft)]"><Gift className="size-10 text-[var(--i-accent)]" /><span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)]">{String(index + 1).padStart(2, "0")}</span></div>;
   }
 
@@ -257,9 +259,8 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
         key={src}
         src={src}
         alt={`Imagem sugerida de ${gift.name}`}
-        referrerPolicy="no-referrer"
         className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
-        onError={() => storedUrl && !storedFailed ? setStoredFailed(true) : setProxyFailed(true)}
+        onError={() => setFailed(true)}
       />
       <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)] shadow-sm">{String(index + 1).padStart(2, "0")}</span>
     </div>
