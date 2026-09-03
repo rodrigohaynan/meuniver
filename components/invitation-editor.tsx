@@ -542,10 +542,11 @@ function GiftImagePreview({ gift }: { gift: GiftItem }) {
     setFailed(false);
   }, [gift.manual_image_url, gift.suggestion_image_url]);
 
-  const storedSuggestion = gift.suggestion_image_url?.includes("/storage/v1/object/public/invite-media/")
-    ? gift.suggestion_image_url
-    : null;
-  const src = gift.manual_image_url || storedSuggestion;
+  const suggestionImage =
+    gift.suggestion_image_url && /^https?:\/\//i.test(gift.suggestion_image_url)
+      ? gift.suggestion_image_url
+      : null;
+  const src = gift.manual_image_url || suggestionImage;
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-[#f6eee9]">
@@ -554,6 +555,7 @@ function GiftImagePreview({ gift }: { gift: GiftItem }) {
           key={src}
           src={src}
           alt={gift.name}
+          referrerPolicy="no-referrer"
           className="h-40 w-full object-contain"
           onError={() => setFailed(true)}
         />

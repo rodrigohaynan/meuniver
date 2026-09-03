@@ -534,7 +534,7 @@ async function viaMercadoLivreApi(rawUrl: string): Promise<CapturedImage | null>
   return null;
 }
 
-async function direct(rawUrl: string): Promise<CapturedImage> {
+async function resolveDirectImage(rawUrl: string): Promise<{ imageUrl: URL; referer: string }> {
   const productUrl = new URL(rawUrl);
   const page = await fetchPublic(
     productUrl,
@@ -552,7 +552,12 @@ async function direct(rawUrl: string): Promise<CapturedImage> {
   }
   const html = new TextDecoder().decode(await readLimited(page.response, MAX_HTML_BYTES));
   const imageUrl = extractImageUrl(html, page.finalUrl);
-  return downloadImage(imageUrl, page.finalUrl.toString());
+  return { imageUrl, referer: page.finalUrl.toString() };
+}
+
+async function direct(rawUrl: string): Promise<CapturedImage> {
+  const resolved = await resolveDirectImage(rawUrl);
+  return downloadImage(resolved.imageUrl, resolved.referer);
 }
 
 
@@ -685,3 +690,20 @@ export async function captureProductImage(rawUrl: string): Promise<CapturedImage
     throw directError instanceof Error ? directError : new Error("Não foi possível capturar a imagem do anúncio.");
   }
 }
+
+export async function resolveProductImageUrl(rawUrl: string): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("O link de sugestão é inválido.");
+  }
+
+  const resolved = await resolveDirectImage(parsed.toString());
+  const score = marketplaceProductScore(resolved.imageUrl) + genericAssetPenalty(resolved.imageUrl);
+  if (score < 0) {
+    throw new Error("O anúncio retornou apenas uma imagem institucional, não a foto do produto.");
+  }
+  return resolved.imageUrl.toString();
+}
+

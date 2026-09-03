@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { captureProductImage } from "@/lib/product-image";
+import { captureProductImage, resolveProductImageUrl } from "@/lib/product-image";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -120,10 +120,45 @@ export async function POST(request: Request) {
     }
 
     return Response.json({ imageUrl, suggestionUrl });
-  } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Não foi possível capturar automaticamente a imagem do anúncio." },
-      { status: 422 },
-    );
+  } catch (captureError) {
+    try {
+      const remoteImageUrl = await resolveProductImageUrl(suggestionUrl);
+
+      const { error: updateError } = await supabase
+        .from("gifts")
+        .update({ suggestion_url: suggestionUrl, suggestion_image_url: remoteImageUrl })
+        .eq("id", gift.id);
+
+      if (updateError) {
+        return Response.json(
+          { error: `A foto do produto foi localizada, mas não pôde ser vinculada ao presente: ${updateError.message}` },
+          { status: 502 },
+        );
+      }
+
+      const previousPath = storagePathFromPublicUrl(gift.suggestion_image_url);
+      if (previousPath) {
+        await supabase.storage.from("invite-media").remove([previousPath]).catch(() => undefined);
+      }
+
+      return Response.json({
+        imageUrl: remoteImageUrl,
+        suggestionUrl,
+        stored: false,
+        warning: "O marketplace bloqueou a cópia da imagem no servidor; a foto real será exibida diretamente do anúncio.",
+      });
+    } catch (resolveError) {
+      const captureMessage = captureError instanceof Error
+        ? captureError.message
+        : "Não foi possível copiar a imagem do anúncio.";
+      const resolveMessage = resolveError instanceof Error
+        ? resolveError.message
+        : "Não foi possível localizar a URL real da foto.";
+
+      return Response.json(
+        { error: `${captureMessage} ${resolveMessage}` },
+        { status: 422 },
+      );
+    }
   }
 }

@@ -244,10 +244,11 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
     setFailed(false);
   }, [gift.manual_image_url, gift.suggestion_image_url]);
 
-  const storedSuggestion = gift.suggestion_image_url?.includes("/storage/v1/object/public/invite-media/")
-    ? gift.suggestion_image_url
-    : null;
-  const src = gift.manual_image_url || storedSuggestion;
+  const suggestionImage =
+    gift.suggestion_image_url && /^https?:\/\//i.test(gift.suggestion_image_url)
+      ? gift.suggestion_image_url
+      : null;
+  const src = gift.manual_image_url || suggestionImage;
 
   if (!src || failed) {
     return <div className="relative grid aspect-[4/3] place-items-center bg-[var(--i-soft)]"><Gift className="size-10 text-[var(--i-accent)]" /><span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)]">{String(index + 1).padStart(2, "0")}</span></div>;
@@ -259,6 +260,7 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
         key={src}
         src={src}
         alt={`Imagem sugerida de ${gift.name}`}
+        referrerPolicy="no-referrer"
         className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
         onError={() => setFailed(true)}
       />
