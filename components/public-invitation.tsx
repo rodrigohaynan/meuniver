@@ -254,6 +254,7 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
         key={src}
         src={src}
         alt={`Imagem sugerida de ${gift.name}`}
+        referrerPolicy="no-referrer"
         className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
         onError={() => storedUrl && !storedFailed ? setStoredFailed(true) : setProxyFailed(true)}
       />

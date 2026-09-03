@@ -146,29 +146,19 @@ export function InvitationEditor({
     const cleanUrl = suggestionUrl.trim();
     if (!cleanUrl) return null;
 
-    const response = await fetch(`/api/product-image/${encodeURIComponent(giftId)}?url=${encodeURIComponent(cleanUrl)}&t=${Date.now()}`, {
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).trim();
-      throw new Error(detail || "Não foi possível capturar a imagem desse anúncio.");
+    const response = await fetch(
+      `/api/product-image/${encodeURIComponent(giftId)}?url=${encodeURIComponent(cleanUrl)}&format=json&t=${Date.now()}`,
+      { cache: "no-store" },
+    );
+
+    const result = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+    if (!response.ok || !result?.imageUrl) {
+      throw new Error(result?.error || "Não foi possível localizar a imagem principal desse anúncio.");
     }
 
-    const blob = await response.blob();
-    if (!blob.type.startsWith("image/")) throw new Error("O anúncio não retornou uma imagem válida.");
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Sessão expirada.");
-
-    const extension = safeExtension(blob.type, "produto.jpg");
-    const path = `${user.id}/${invitation.id}/gift-link-${giftId}-${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("invite-media").upload(path, blob, {
-      upsert: false,
-      contentType: blob.type,
-    });
-    if (uploadError) throw new Error(uploadError.message);
-
-    return supabase.storage.from("invite-media").getPublicUrl(path).data.publicUrl;
+    // Nesta fase de testes guardamos a URL resolvida da imagem. Isso evita uma
+    // segunda requisição/download que vinha falhando em marketplaces como Mercado Livre.
+    return result.imageUrl;
   }
 
   async function addGift() {
@@ -560,6 +550,7 @@ function GiftImagePreview({ gift }: { gift: GiftItem }) {
           key={src}
           src={src}
           alt={gift.name}
+          referrerPolicy="no-referrer"
           className="h-40 w-full object-contain"
           onError={() => stored && !storedFailed ? setStoredFailed(true) : setProxyFailed(true)}
         />
