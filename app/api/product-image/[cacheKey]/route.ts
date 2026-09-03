@@ -23,7 +23,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ cach
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch {
-    return new Response("Imagem indisponível.", { status: 404, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Imagem indisponível.";
+    return new Response(message, {
+      status: 404,
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+    });
   }
 }

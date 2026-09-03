@@ -149,7 +149,10 @@ export function InvitationEditor({
     const response = await fetch(`/api/product-image/${encodeURIComponent(giftId)}?url=${encodeURIComponent(cleanUrl)}&t=${Date.now()}`, {
       cache: "no-store",
     });
-    if (!response.ok) throw new Error("Não foi possível capturar a imagem desse anúncio.");
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => "")).trim();
+      throw new Error(detail || "Não foi possível capturar a imagem desse anúncio.");
+    }
 
     const blob = await response.blob();
     if (!blob.type.startsWith("image/")) throw new Error("O anúncio não retornou uma imagem válida.");

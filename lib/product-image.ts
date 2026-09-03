@@ -358,6 +358,182 @@ async function downloadImage(imageUrl: URL, referer: string): Promise<CapturedIm
   return { bytes, contentType };
 }
 
+
+
+type MercadoLivreItemPayload = {
+  id?: string;
+  thumbnail?: string;
+  secure_thumbnail?: string;
+  pictures?: Array<{ url?: string; secure_url?: string }>;
+};
+
+function isMercadoLivreHost(hostname: string) {
+  const host = hostname.toLowerCase();
+  return host === "mercadolivre.com.br" || host.endsWith(".mercadolivre.com.br") || host === "mercadolibre.com" || host.endsWith(".mercadolibre.com");
+}
+
+function mercadoLivreIds(rawUrl: string) {
+  const itemIds = new Set<string>();
+  const productIds = new Set<string>();
+
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return { itemIds: [] as string[], productIds: [] as string[] };
+  }
+
+  const addItem = (value: string | null | undefined) => {
+    const match = value?.toUpperCase().match(/\b(MLB\d{6,})\b/);
+    if (match) itemIds.add(match[1]);
+  };
+
+  addItem(url.searchParams.get("wid"));
+
+  for (const key of ["pdp_filters", "filters"]) {
+    const value = url.searchParams.get(key);
+    if (value) {
+      const decoded = decodeURIComponent(value);
+      const match = decoded.toUpperCase().match(/(?:ITEM_ID\s*[:=]\s*)?(MLB\d{6,})/);
+      if (match) itemIds.add(match[1]);
+    }
+  }
+
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+  addItem(hashParams.get("wid"));
+  for (const key of ["pdp_filters", "filters"]) {
+    const value = hashParams.get(key);
+    if (value) {
+      const decoded = decodeURIComponent(value);
+      const match = decoded.toUpperCase().match(/(?:ITEM_ID\s*[:=]\s*)?(MLB\d{6,})/);
+      if (match) itemIds.add(match[1]);
+    }
+  }
+
+  const productPath = url.pathname.match(/\/p\/(MLB\d{6,})\b/i);
+  if (productPath) productIds.add(productPath[1].toUpperCase());
+
+  // Como último recurso, procura IDs MLB no fragmento/consulta, mas evita
+  // tratar o ID de catálogo /p/ como item quando ele for o único encontrado.
+  const decodedUrl = decodeURIComponent(rawUrl);
+  for (const match of decodedUrl.toUpperCase().matchAll(/\bMLB\d{6,}\b/g)) {
+    const id = match[0];
+    if (!productIds.has(id)) itemIds.add(id);
+  }
+
+  return { itemIds: [...itemIds], productIds: [...productIds] };
+}
+
+function mercadoLivreApiHeaders() {
+  const headers: Record<string, string> = {
+    "user-agent": USER_AGENT,
+    accept: "application/json",
+    "accept-language": "pt-BR,pt;q=0.9,en;q=0.7",
+  };
+  const token = process.env.MERCADOLIBRE_ACCESS_TOKEN?.trim();
+  if (token) headers.authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function mercadoLivreItemImage(itemId: string): Promise<CapturedImage | null> {
+  const apiUrl = new URL(`https://api.mercadolibre.com/items/${encodeURIComponent(itemId)}`);
+  apiUrl.searchParams.set("attributes", "id,title,pictures,thumbnail,secure_thumbnail");
+
+  const result = await fetchPublic(apiUrl, { headers: mercadoLivreApiHeaders() }, PAGE_TIMEOUT_MS);
+  if (result.response.status !== 200 && result.response.status !== 206) {
+    await result.response.body?.cancel().catch(() => undefined);
+    return null;
+  }
+
+  let payload: MercadoLivreItemPayload;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(await readLimited(result.response, 2_000_000))) as MercadoLivreItemPayload;
+  } catch {
+    return null;
+  }
+
+  const addresses = [
+    ...(payload.pictures ?? []).flatMap((picture) => [picture.secure_url, picture.url]),
+    payload.secure_thumbnail,
+    payload.thumbnail,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const address of addresses) {
+    try {
+      const imageUrl = new URL(address);
+      if (!imageUrl.hostname.toLowerCase().endsWith("mlstatic.com")) continue;
+      return await downloadImage(imageUrl, `https://www.mercadolivre.com.br/`);
+    } catch {
+      // Tenta a próxima foto do próprio item.
+    }
+  }
+  return null;
+}
+
+function collectMercadoLivreImageUrls(value: unknown, output: string[]) {
+  if (!value) return;
+  if (typeof value === "string") {
+    if (/^https?:\/\//i.test(value) && /mlstatic\.com/i.test(value)) output.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectMercadoLivreImageUrls(entry, output));
+    return;
+  }
+  if (typeof value !== "object") return;
+  for (const nested of Object.values(value as Record<string, unknown>)) {
+    collectMercadoLivreImageUrls(nested, output);
+  }
+}
+
+async function mercadoLivreProductImage(productId: string): Promise<CapturedImage | null> {
+  const apiUrl = new URL(`https://api.mercadolibre.com/products/${encodeURIComponent(productId)}`);
+  const result = await fetchPublic(apiUrl, { headers: mercadoLivreApiHeaders() }, PAGE_TIMEOUT_MS);
+  if (!result.response.ok) {
+    await result.response.body?.cancel().catch(() => undefined);
+    return null;
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(await readLimited(result.response, 3_000_000)));
+  } catch {
+    return null;
+  }
+
+  const addresses: string[] = [];
+  collectMercadoLivreImageUrls(payload, addresses);
+  for (const address of [...new Set(addresses)]) {
+    try {
+      return await downloadImage(new URL(address), "https://www.mercadolivre.com.br/");
+    } catch {
+      // Tenta a próxima foto encontrada no catálogo.
+    }
+  }
+  return null;
+}
+
+async function viaMercadoLivreApi(rawUrl: string): Promise<CapturedImage | null> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (!isMercadoLivreHost(parsed.hostname)) return null;
+
+  const { itemIds, productIds } = mercadoLivreIds(rawUrl);
+  for (const itemId of itemIds) {
+    const image = await mercadoLivreItemImage(itemId).catch(() => null);
+    if (image) return image;
+  }
+  for (const productId of productIds) {
+    const image = await mercadoLivreProductImage(productId).catch(() => null);
+    if (image) return image;
+  }
+  return null;
+}
+
 async function direct(rawUrl: string): Promise<CapturedImage> {
   const productUrl = new URL(rawUrl);
   const page = await fetchPublic(
@@ -415,6 +591,10 @@ export async function captureProductImage(rawUrl: string): Promise<CapturedImage
   } catch {
     throw new Error("O link de sugestão é inválido.");
   }
+
+  const mercadoLivreImage = await viaMercadoLivreApi(normalized).catch(() => null);
+  if (mercadoLivreImage) return mercadoLivreImage;
+
   try {
     return await direct(normalized);
   } catch (directError) {
