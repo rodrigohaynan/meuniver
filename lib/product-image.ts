@@ -1155,7 +1155,7 @@ function openGraphIoAppId() {
 }
 
 function openGraphIoProxyMode() {
-  return (process.env.OPENGRAPH_IO_PROXY_MODE?.trim().toLowerCase() || "premium");
+  return (process.env.OPENGRAPH_IO_PROXY_MODE?.trim().toLowerCase() || "standard");
 }
 
 async function captureMercadoLivreViaOpenGraphIo(
@@ -1173,20 +1173,24 @@ async function captureMercadoLivreViaOpenGraphIo(
   );
   endpoint.searchParams.set("app_id", appId);
 
-  // Não reutiliza cache de uma leitura anterior que possa ter recebido
-  // a imagem institucional do Mercado Livre.
+  // Evita reutilizar um resultado antigo com imagem institucional.
   endpoint.searchParams.set("cache_ok", "false");
-  endpoint.searchParams.set("retry", "true");
-  endpoint.searchParams.set("auto_render", "false");
   endpoint.searchParams.set("accept_lang", "pt-BR");
 
-  // O problema observado acontece em IPs de datacenter. Premium usa proxy
-  // residencial; "mobile" pode ser habilitado apenas pela variável de ambiente,
-  // sem nova alteração de código, se o residencial ainda não for suficiente.
-  if (openGraphIoProxyMode() === "mobile") {
+  // A conta Free tem 100 créditos/mês. Não forçamos mais o proxy premium:
+  // no modo padrão usamos proxy comum + renderização completa.
+  endpoint.searchParams.set("auto_proxy", "false");
+  endpoint.searchParams.set("auto_render", "false");
+  endpoint.searchParams.set("retry", "false");
+  endpoint.searchParams.set("full_render", "true");
+
+  const proxyMode = openGraphIoProxyMode();
+  if (proxyMode === "mobile") {
     endpoint.searchParams.set("use_superior", "true");
-  } else {
+  } else if (proxyMode === "premium") {
     endpoint.searchParams.set("use_premium", "true");
+  } else {
+    endpoint.searchParams.set("use_proxy", "true");
   }
 
   const result = await fetchPublic(
@@ -1203,8 +1207,33 @@ async function captureMercadoLivreViaOpenGraphIo(
 
   if (!result.response.ok) {
     const status = result.response.status;
-    await result.response.body?.cancel().catch(() => undefined);
-    throw new Error(`O proxy residencial respondeu com erro (${status}).`);
+    let detail = "";
+    try {
+      const errorBytes = await readLimited(result.response, 64_000);
+      const raw = new TextDecoder("utf-8").decode(errorBytes).trim();
+      if (raw) {
+        try {
+          const payload = JSON.parse(raw) as {
+            error?: string;
+            message?: string;
+            description?: string;
+          };
+          detail =
+            payload.message ??
+            payload.error ??
+            payload.description ??
+            raw.slice(0, 300);
+        } catch {
+          detail = raw.slice(0, 300);
+        }
+      }
+    } catch {
+      await result.response.body?.cancel().catch(() => undefined);
+    }
+
+    throw new Error(
+      `OpenGraph.io respondeu com erro ${status}${detail ? `: ${detail}` : ""}`,
+    );
   }
 
   const bytes = await readLimited(result.response, 1_000_000);
@@ -1231,11 +1260,11 @@ async function captureMercadoLivreViaOpenGraphIo(
         ? openGraphImage
         : openGraphImage?.url ?? "");
   } catch {
-    throw new Error("A resposta do proxy residencial não pôde ser interpretada.");
+    throw new Error("A resposta do OpenGraph.io não pôde ser interpretada.");
   }
 
   if (!imageAddress) {
-    throw new Error("O proxy residencial não encontrou uma OG Image para esse produto.");
+    throw new Error("O OpenGraph.io não encontrou uma OG Image válida para esse produto.");
   }
 
   let imageUrl: URL;
@@ -1347,14 +1376,16 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
   // 3) Links longos do Mercado Livre podem entregar página reduzida ou antibot
   // para IPs de datacenter. Neste caso muda a ORIGEM da requisição usando proxy
   // residencial, em vez de continuar tentando interpretar o mesmo HTML errado.
+  let openGraphIoError: Error | null = null;
   if (originalUrl && isMercadoLivreMicrolinkTarget(originalUrl) && openGraphIoAppId()) {
     try {
       return await captureMercadoLivreViaOpenGraphIo(originalUrl);
     } catch (error) {
-      console.warn(
-        "[gift-image] OpenGraph.io Mercado Livre:",
-        error instanceof Error ? error.message : error,
-      );
+      openGraphIoError =
+        error instanceof Error
+          ? error
+          : new Error("Falha desconhecida ao consultar o OpenGraph.io.");
+      console.warn("[gift-image] OpenGraph.io Mercado Livre:", openGraphIoError.message);
     }
   }
 
@@ -1384,6 +1415,9 @@ export async function captureProductImageFromUrl(rawUrl: string): Promise<Captur
       );
     }
 
+    if (openGraphIoError) {
+      throw new Error(`Falha na captura avançada: ${openGraphIoError.message}`);
+    }
     if (socialError) throw socialError;
     if (directError) throw directError;
 
