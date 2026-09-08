@@ -1,17 +1,20 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Gift, Palette, PartyPopper, Smartphone, UsersRound } from "lucide-react";
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "Meu Convite";
-
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-hidden">
+    <main className="min-h-screen overflow-hidden bg-[#f8f4f1]">
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/" className="flex items-center gap-2 font-display text-xl font-bold text-[#4b2230]">
-          <span className="grid size-10 place-items-center rounded-2xl bg-[#7d1f37] text-white">
-            <PartyPopper className="size-5" />
-          </span>
-          {appName}
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/brand/convniver-logo.png"
+            alt="CONVNIVER"
+            width={300}
+            height={102}
+            className="h-auto w-[180px] sm:w-[220px]"
+            priority
+          />
         </Link>
         <Link href="/entrar" className="rounded-full border border-[#d8c5b8] bg-white px-5 py-2.5 text-sm font-bold text-[#5a3740] shadow-sm transition hover:border-[#aa7280]">
           Entrar
@@ -37,25 +40,20 @@ export default function HomePage() {
               Ver recursos
             </a>
           </div>
-          <p className="mt-4 text-sm text-[#8b777c]">Comece grátis com e-mail e senha.</p>
+          <p className="mt-4 text-sm text-[#8b777c]">Comece com e-mail, Google ou Facebook.</p>
         </div>
 
         <div className="relative">
           <div className="absolute -left-8 -top-8 size-36 rounded-full bg-[#efd4db] blur-3xl" />
-          <div className="relative rounded-[2.3rem] border border-[#dfd0c6] bg-white/90 p-4 shadow-[0_30px_80px_rgba(79,39,51,.14)] sm:p-6">
+          <div className="relative overflow-hidden rounded-[2.3rem] border border-[#dfd0c6] bg-white/90 p-4 shadow-[0_30px_80px_rgba(79,39,51,.14)] sm:p-6">
             <div className="overflow-hidden rounded-[1.8rem] bg-[#f8eee9]">
-              <div className="grid min-h-80 place-items-center p-8 text-center">
-                <div>
-                  <span className="mx-auto grid size-16 place-items-center rounded-full bg-white text-3xl shadow-sm">🎂</span>
-                  <p className="mt-6 text-sm font-bold uppercase tracking-[.18em] text-[#a17536]">Você está convidado</p>
-                  <h2 className="mt-3 font-display text-4xl font-bold text-[#421e28]">Aniversário da Sofia</h2>
-                  <p className="mt-3 text-[#7b666b]">8 anos • sábado, 19h</p>
-                  <div className="mx-auto mt-6 h-px max-w-xs bg-[#dfc9bf]" />
-                  <p className="mx-auto mt-6 max-w-md leading-7 text-[#735f64]">
-                    Uma tarde cheia de alegria, brincadeiras e pessoas especiais.
-                  </p>
-                </div>
-              </div>
+              <Image
+                src="/brand/convniver-login-hero.png"
+                alt="Apresentação do Convniver em uma cena de festa"
+                width={1024}
+                height={1024}
+                className="h-auto w-full"
+              />
             </div>
             <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs font-bold text-[#654f54]">
               <div className="rounded-2xl bg-[#fff7f3] p-3">🎨 Cores</div>

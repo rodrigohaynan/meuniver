@@ -1,19 +1,36 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
-import { PartyPopper } from "lucide-react";
 import { AuthCard } from "@/components/auth-card";
 
 export default function LoginPage() {
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Meu Convite";
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-[#f8f4f1]">
       <div className="mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-5 py-8 sm:px-8 lg:grid-cols-[1fr_460px]">
         <section className="hidden lg:block">
-          <Link href="/" className="inline-flex items-center gap-2 font-display text-2xl font-bold text-[#4b2230]">
-            <span className="grid size-11 place-items-center rounded-2xl bg-[#7d1f37] text-white"><PartyPopper className="size-5" /></span>
-            {appName}
+          <Link href="/" className="inline-flex items-center">
+            <Image
+              src="/brand/convniver-logo.png"
+              alt="CONVNIVER"
+              width={320}
+              height={109}
+              className="h-auto w-[220px]"
+              priority
+            />
           </Link>
-          <h2 className="mt-12 max-w-2xl font-display text-6xl font-bold leading-[1.04] text-[#351820]">
+
+          <div className="mt-10 overflow-hidden rounded-[2rem] border border-[#e0d3cb] bg-white shadow-[0_20px_70px_rgba(74,36,47,.10)]">
+            <Image
+              src="/brand/convniver-login-hero.png"
+              alt="Imagem de apresentação da plataforma Convniver"
+              width={1024}
+              height={1024}
+              className="h-auto w-full"
+              priority
+            />
+          </div>
+
+          <h2 className="mt-10 max-w-2xl font-display text-6xl font-bold leading-[1.04] text-[#351820]">
             Seu convite começa aqui.
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-[#756167]">
@@ -28,9 +45,15 @@ export default function LoginPage() {
         </section>
         <section className="flex justify-center">
           <div className="w-full">
-            <Link href="/" className="mb-6 inline-flex items-center gap-2 font-display text-xl font-bold text-[#4b2230] lg:hidden">
-              <span className="grid size-10 place-items-center rounded-2xl bg-[#7d1f37] text-white"><PartyPopper className="size-5" /></span>
-              {appName}
+            <Link href="/" className="mb-6 inline-flex items-center lg:hidden">
+              <Image
+                src="/brand/convniver-logo.png"
+                alt="CONVNIVER"
+                width={260}
+                height={89}
+                className="h-auto w-[185px]"
+                priority
+              />
             </Link>
             <Suspense fallback={<div className="h-96 rounded-[2rem] bg-white/70" />}>
               <AuthCard />
