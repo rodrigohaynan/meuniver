@@ -41,14 +41,6 @@ function appBaseUrl() {
   return new URL("http://localhost:3000");
 }
 
-function absoluteUrl(value: string) {
-  try {
-    return new URL(value).toString();
-  } catch {
-    return new URL(value, appBaseUrl()).toString();
-  }
-}
-
 function metadataDescription(invitation: Invitation) {
   const text = invitation.invitation_text.trim().replace(/\s+/g, " ");
 
@@ -93,11 +85,13 @@ export async function generateMetadata({
   const description = metadataDescription(invitation);
   const invitationUrl = new URL(`/c/${encodeURIComponent(slug)}`, appBaseUrl()).toString();
 
-  // A foto principal cadastrada pelo organizador vira a OG Image do convite.
-  // Se não houver foto, usa a arte institucional do CONVNIVER.
-  const previewImage = invitation.hero_image_url?.trim()
-    ? absoluteUrl(invitation.hero_image_url.trim())
-    : new URL("/brand/convniver-login-hero.png", appBaseUrl()).toString();
+  // A OG Image agora é servida pelo próprio domínio do CONVNIVER.
+  // A rota transforma a foto principal em uma imagem PNG 1200x630,
+  // evitando incompatibilidades do WhatsApp com a URL externa do Supabase.
+  const previewImage = new URL(
+    `/c/${encodeURIComponent(slug)}/og-image`,
+    appBaseUrl(),
+  ).toString();
 
   const imageAlt = invitation.host_name.trim()
     ? `Convite de aniversário de ${invitation.host_name.trim()}`
@@ -119,6 +113,9 @@ export async function generateMetadata({
       images: [
         {
           url: previewImage,
+          width: 1200,
+          height: 630,
+          type: "image/png",
           alt: imageAlt,
         },
       ],
