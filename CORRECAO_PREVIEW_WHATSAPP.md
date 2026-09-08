@@ -26,3 +26,16 @@ A rota antiga `app/c/[slug]/og-image/route.tsx` foi mantida por compatibilidade,
    O parâmetro é apenas para forçar uma nova tentativa de prévia enquanto o WhatsApp ainda pode ter cache da URL anterior.
 
 Se a rota `/og-image.jpg` abrir a imagem normalmente após o deploy, o HTML da página passará a apontar para essa imagem social otimizada.
+
+
+## Correção adicional do build (TypeScript + sharp)
+
+Se o Netlify mostrar `Cannot find namespace 'sharp'`, **não instale `@types/sharp`**. O pacote `sharp` já inclui os próprios tipos.
+
+A rota foi corrigida para usar:
+
+```ts
+type SharpPipeline = ReturnType<typeof sharp>;
+```
+
+em vez de `sharp.Sharp`. Isso elimina o erro de namespace no TypeScript/Next 16.

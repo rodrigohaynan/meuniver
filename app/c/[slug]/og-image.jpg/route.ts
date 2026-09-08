@@ -2,6 +2,8 @@ import sharp from "sharp";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
 
+type SharpPipeline = ReturnType<typeof sharp>;
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -136,7 +138,7 @@ async function fallbackCanvas(title: string) {
   return sharp(Buffer.from(svg));
 }
 
-async function toCompactJpeg(image: sharp.Sharp) {
+async function toCompactJpeg(image: SharpPipeline) {
   for (const quality of [72, 64, 56, 48, 42]) {
     const output = await image
       .clone()
@@ -166,7 +168,7 @@ export async function GET(
   const invitation = (data as Invitation | null) ?? null;
   const title = invitationTitle(invitation);
 
-  let pipeline: sharp.Sharp;
+  let pipeline: SharpPipeline;
 
   if (invitation?.hero_image_url?.trim()) {
     try {
