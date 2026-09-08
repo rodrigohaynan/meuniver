@@ -42,6 +42,14 @@ function normalizePersonName(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 }
 
+type DuplicateInfo = {
+  submittedName: string;
+  existingName: string;
+  contactName: string;
+  rsvpId: string;
+  matchType?: "exact" | "first-name";
+};
+
 export function PublicInvitation({ initialInvitation, initialGifts }: { initialInvitation: Invitation; initialGifts: GiftItem[] }) {
   const invitation = {
     ...initialInvitation,
@@ -58,6 +66,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
   const [attendees, setAttendees] = useState<Rsvp["attendees"]>([{ name: "", category: "adult" }]);
   const [includeContactAsAttendee, setIncludeContactAsAttendee] = useState(true);
   const [rsvpContactCategory, setRsvpContactCategory] = useState<Rsvp["attendees"][number]["category"]>("adult");
+  const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
   const supabase = useMemo(() => createClient(), []);
@@ -146,8 +155,58 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
     setMessage("Presente reservado. Obrigado! 🎁");
   }
 
+  async function performRsvpSubmit(allowDuplicate = false): Promise<"saved" | "cancelled"> {
+    const { data, error } = await supabase.rpc("submit_rsvp_public", {
+      p_invitation_id: invitation.id,
+      p_contact_name: rsvpContact.trim(),
+      p_whatsapp: rsvpWhatsapp.trim(),
+      p_attendees: effectiveAttendees,
+      p_allow_duplicate: allowDuplicate,
+    });
+
+    if (error) throw new Error(error.message);
+
+    const result = data as {
+      ok?: boolean;
+      error?: string;
+      code?: string;
+      duplicates?: DuplicateInfo[];
+    } | null;
+
+    if (result?.code === "duplicate-name" && result.duplicates?.length) {
+      const lines = result.duplicates.map((item) => {
+        if (item.matchType === "first-name") {
+          if (item.rsvpId === "current") {
+            return `• ${item.submittedName}: possível duplicidade com ${item.existingName} nesta mesma confirmação (mesmo primeiro nome).`;
+          }
+          return `• ${item.submittedName}: possível duplicidade. Já existe ${item.existingName}, adicionado(a) por ${item.contactName}.`;
+        }
+
+        if (item.rsvpId === "current") {
+          return `• ${item.submittedName}: o nome aparece duas vezes nesta mesma confirmação.`;
+        }
+
+        return `• ${item.submittedName}: pessoa com nome igual já foi adicionada por ${item.contactName}.`;
+      });
+
+      const proceed = window.confirm(
+        `ATENÇÃO — POSSÍVEL DUPLICIDADE\n\n${lines.join("\n")}\n\nSe forem pessoas diferentes, toque em OK para confirmar mesmo assim. Caso contrário, toque em Cancelar e corrija a lista.`,
+      );
+
+      if (!proceed) return "cancelled";
+      return performRsvpSubmit(true);
+    }
+
+    if (!result?.ok) {
+      throw new Error(result?.error ?? "Não foi possível confirmar a presença.");
+    }
+
+    return "saved";
+  }
+
   async function submitRsvp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (rsvpSubmitting) return;
 
     if (rsvpContact.trim().length < 2 || effectiveAttendees.length === 0) {
       setMessage("Informe o responsável e pelo menos uma pessoa confirmada.");
@@ -159,24 +218,27 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
       return;
     }
 
-    const { error } = await supabase.from("rsvps").insert({
-      invitation_id: invitation.id,
-      contact_name: rsvpContact.trim(),
-      whatsapp: rsvpWhatsapp.trim(),
-      attendees: effectiveAttendees,
-    });
+    setRsvpSubmitting(true);
+    setMessage("");
 
-    if (error) {
-      setMessage(error.message);
-      return;
+    try {
+      const outcome = await performRsvpSubmit();
+      if (outcome === "cancelled") {
+        setMessage("Revise a lista antes de confirmar.");
+        return;
+      }
+
+      setRsvpContact("");
+      setRsvpWhatsapp("");
+      setAttendees([{ name: "", category: "adult" }]);
+      setIncludeContactAsAttendee(true);
+      setRsvpContactCategory("adult");
+      setMessage("Presença confirmada. Nos vemos na festa! 🎉");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível confirmar a presença.");
+    } finally {
+      setRsvpSubmitting(false);
     }
-
-    setRsvpContact("");
-    setRsvpWhatsapp("");
-    setAttendees([{ name: "", category: "adult" }]);
-    setIncludeContactAsAttendee(true);
-    setRsvpContactCategory("adult");
-    setMessage("Presença confirmada. Nos vemos na festa! 🎉");
   }
 
   const dateText = invitation.event_date
@@ -383,8 +445,11 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                 )}
               </div>
 
-              <button className="mt-5 h-11 rounded-full bg-[var(--i-accent)] px-6 font-bold text-white">
-                Confirmar presença
+              <button
+                disabled={rsvpSubmitting}
+                className="mt-5 h-11 rounded-full bg-[var(--i-accent)] px-6 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {rsvpSubmitting ? "Verificando nomes…" : "Confirmar presença"}
               </button>
             </form>
           </section>
