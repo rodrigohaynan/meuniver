@@ -125,11 +125,12 @@ export async function generateMetadata({
   const baseUrl = await appBaseUrl();
   const invitationUrl = new URL(`/c/${encodeURIComponent(slug)}`, baseUrl).toString();
 
-  // JPEG otimizado e servido no mesmo domínio do convite.
-  // A versão muda quando a foto/título/enquadramento muda para reduzir problemas
-  // de cache do WhatsApp.
+  // Usa a rota /og-image, que é a URL já validada publicamente no Netlify.
+  // A resposta desta rota é JPEG 1200x630 e comprimida para ficar bem abaixo
+  // do limite prático do WhatsApp. A versão na query renova apenas a imagem
+  // quando a foto/título/enquadramento do convite muda.
   const previewImageUrl = new URL(
-    `/c/${encodeURIComponent(slug)}/og-image.jpg`,
+    `/c/${encodeURIComponent(slug)}/og-image`,
     baseUrl,
   );
   previewImageUrl.searchParams.set("v", previewVersion(invitation));
