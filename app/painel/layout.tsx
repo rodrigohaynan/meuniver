@@ -6,22 +6,16 @@ import { LogoutButton } from "@/components/logout-button";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
   return (
     <main className="min-h-screen bg-[#f8f4f1]">
       <header className="sticky top-0 z-40 border-b border-[#e6d9d2] bg-[#f8f4f1]/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-8">
-          <Link href="/painel" className="flex items-center gap-3">
-            <Image
-              src="/brand/convniver-icon.png"
-              alt="Ícone Convniver"
-              width={40}
-              height={40}
-              className="size-10 rounded-xl"
-              priority
-            />
+          <Link href="/painel" className="flex items-center">
             <Image
               src="/brand/convniver-logo.png"
               alt="CONVNIVER"
