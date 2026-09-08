@@ -13,6 +13,7 @@ import {
   MoveHorizontal,
   MoveVertical,
   Palette,
+  Pencil,
   Plus,
   RotateCcw,
   Save,
@@ -26,6 +27,12 @@ import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
 import { exportAttendancePdf, exportAttendanceXlsx } from "@/lib/attendance-export";
 
 type Tab = "content" | "appearance" | "photo" | "gifts" | "responses";
+
+type RsvpEditDraft = {
+  contact_name: string;
+  whatsapp: string;
+  attendees: Rsvp["attendees"];
+};
 
 const PHOTO_ZOOM_MIN = 1;
 const PHOTO_ZOOM_MAX = 2.5;
@@ -72,8 +79,11 @@ export function InvitationEditor({
     hero_image_y: initialInvitation.hero_image_y ?? 50,
   });
   const [gifts, setGifts] = useState(initialGifts.map((gift) => ({ ...gift, suggestion_image_url: gift.suggestion_image_url ?? null })));
-  const [rsvps] = useState(initialRsvps);
+  const [rsvps, setRsvps] = useState(initialRsvps);
   const [reservations] = useState(initialReservations);
+  const [editingRsvpId, setEditingRsvpId] = useState<string | null>(null);
+  const [rsvpDraft, setRsvpDraft] = useState<RsvpEditDraft | null>(null);
+  const [rsvpBusy, setRsvpBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("content");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -348,6 +358,165 @@ export function InvitationEditor({
     setMessage("Reserva liberada.");
   }
 
+  function startRsvpEdit(rsvp: Rsvp) {
+    setEditingRsvpId(rsvp.id);
+    setRsvpDraft({
+      contact_name: rsvp.contact_name,
+      whatsapp: rsvp.whatsapp,
+      attendees: rsvp.attendees.map((item) => ({ ...item })),
+    });
+    setMessage("");
+  }
+
+  function cancelRsvpEdit() {
+    setEditingRsvpId(null);
+    setRsvpDraft(null);
+  }
+
+  function updateRsvpDraftAttendee(
+    index: number,
+    patch: Partial<Rsvp["attendees"][number]>,
+  ) {
+    setRsvpDraft((current) =>
+      current
+        ? {
+            ...current,
+            attendees: current.attendees.map((item, itemIndex) =>
+              itemIndex === index ? { ...item, ...patch } : item,
+            ),
+          }
+        : current,
+    );
+  }
+
+  async function saveRsvpEdit(rsvpId: string) {
+    if (!rsvpDraft || rsvpBusy) return;
+
+    const contactName = rsvpDraft.contact_name.trim().replace(/\s+/g, " ");
+    const whatsapp = rsvpDraft.whatsapp.trim();
+    const attendees = rsvpDraft.attendees.map((item) => ({
+      name: item.name.trim().replace(/\s+/g, " "),
+      category: item.category,
+    }));
+
+    if (contactName.length < 2) {
+      setMessage("Informe o nome do responsável pela confirmação.");
+      return;
+    }
+    if (attendees.length < 1 || attendees.some((item) => item.name.length < 2)) {
+      setMessage("A confirmação precisa ter pelo menos um convidado com nome válido.");
+      return;
+    }
+
+    setRsvpBusy(true);
+    setMessage("");
+    const { error } = await supabase
+      .from("rsvps")
+      .update({
+        contact_name: contactName,
+        whatsapp,
+        attendees,
+      })
+      .eq("id", rsvpId)
+      .eq("invitation_id", invitation.id);
+
+    if (error) {
+      setMessage(error.message);
+      setRsvpBusy(false);
+      return;
+    }
+
+    setRsvps((items) =>
+      items.map((item) =>
+        item.id === rsvpId
+          ? {
+              ...item,
+              contact_name: contactName,
+              whatsapp,
+              attendees,
+            }
+          : item,
+      ),
+    );
+    setEditingRsvpId(null);
+    setRsvpDraft(null);
+    setRsvpBusy(false);
+    setMessage("Confirmação atualizada.");
+  }
+
+  async function removeRsvpAttendee(rsvp: Rsvp, attendeeIndex: number) {
+    if (rsvpBusy) return;
+    const attendee = rsvp.attendees[attendeeIndex];
+    if (!attendee) return;
+
+    if (rsvp.attendees.length === 1) {
+      const proceed = window.confirm(
+        `"${attendee.name}" é a única pessoa desta confirmação. Excluir também a confirmação inteira?`,
+      );
+      if (!proceed) return;
+      await deleteRsvpSubmission(rsvp);
+      return;
+    }
+
+    if (!window.confirm(`Excluir "${attendee.name}" da lista de convidados?`)) return;
+
+    const attendees = rsvp.attendees.filter((_, index) => index !== attendeeIndex);
+    setRsvpBusy(true);
+    const { error } = await supabase
+      .from("rsvps")
+      .update({ attendees })
+      .eq("id", rsvp.id)
+      .eq("invitation_id", invitation.id);
+
+    if (error) {
+      setMessage(error.message);
+      setRsvpBusy(false);
+      return;
+    }
+
+    setRsvps((items) =>
+      items.map((item) => (item.id === rsvp.id ? { ...item, attendees } : item)),
+    );
+    if (editingRsvpId === rsvp.id) {
+      setRsvpDraft((current) =>
+        current
+          ? { ...current, attendees: current.attendees.filter((_, index) => index !== attendeeIndex) }
+          : current,
+      );
+    }
+    setRsvpBusy(false);
+    setMessage(`Convidado "${attendee.name}" excluído.`);
+  }
+
+  async function deleteRsvpSubmission(rsvp: Rsvp) {
+    if (rsvpBusy) return;
+    if (
+      !window.confirm(
+        `Excluir toda a confirmação de ${rsvp.contact_name}? Isso removerá ${rsvp.attendees.length} convidado(s).`,
+      )
+    ) {
+      return;
+    }
+
+    setRsvpBusy(true);
+    const { error } = await supabase
+      .from("rsvps")
+      .delete()
+      .eq("id", rsvp.id)
+      .eq("invitation_id", invitation.id);
+
+    if (error) {
+      setMessage(error.message);
+      setRsvpBusy(false);
+      return;
+    }
+
+    setRsvps((items) => items.filter((item) => item.id !== rsvp.id));
+    if (editingRsvpId === rsvp.id) cancelRsvpEdit();
+    setRsvpBusy(false);
+    setMessage("Confirmação excluída.");
+  }
+
   const adults = rsvps.reduce((sum, rsvp) => sum + rsvp.attendees.filter((item) => item.category === "adult").length, 0);
   const children = rsvps.reduce((sum, rsvp) => sum + rsvp.attendees.filter((item) => item.category === "child").length, 0);
   const totalGuests = adults + children;
@@ -543,7 +712,140 @@ export function InvitationEditor({
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Stat label="Confirmações" value={rsvps.length} /><Stat label="Convidados" value={totalGuests} /><Stat label="Adultos" value={adults} /><Stat label="Crianças" value={children} /></div>
               <h3 className="mt-7 font-display text-xl font-bold">Presenças</h3>
               <div className="mt-3 space-y-3">
-                {rsvps.map((rsvp) => <article key={rsvp.id} className="rounded-2xl border border-[#e1d3cb] bg-white p-4"><p className="font-bold">{rsvp.contact_name}</p><p className="mt-1 text-xs text-[#806e72]">{rsvp.whatsapp || "Sem contato"}</p><div className="mt-3 flex flex-wrap gap-2">{rsvp.attendees.map((attendee, index) => <span key={`${rsvp.id}-${index}`} className="rounded-full bg-[#f5ece7] px-3 py-1 text-xs font-bold text-[#684f55]">{attendee.name} • {attendee.category === "child" ? "Criança" : "Adulto"}</span>)}</div></article>)}
+                {rsvps.map((rsvp) => {
+                  const editing = editingRsvpId === rsvp.id && rsvpDraft;
+                  return (
+                    <article key={rsvp.id} className="rounded-2xl border border-[#e1d3cb] bg-white p-4">
+                      {editing ? (
+                        <div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Field label="Responsável pela confirmação">
+                              <Input
+                                value={rsvpDraft.contact_name}
+                                onChange={(value) => setRsvpDraft({ ...rsvpDraft, contact_name: value })}
+                              />
+                            </Field>
+                            <Field label="WhatsApp">
+                              <Input
+                                value={rsvpDraft.whatsapp}
+                                onChange={(value) => setRsvpDraft({ ...rsvpDraft, whatsapp: value })}
+                              />
+                            </Field>
+                          </div>
+
+                          <div className="mt-4 space-y-2">
+                            {rsvpDraft.attendees.map((attendee, index) => (
+                              <div
+                                key={`${rsvp.id}-edit-${index}`}
+                                className="grid gap-2 rounded-xl bg-[#faf6f3] p-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
+                              >
+                                <input
+                                  value={attendee.name}
+                                  onChange={(event) => updateRsvpDraftAttendee(index, { name: event.target.value })}
+                                  className="h-10 rounded-xl border border-[#d8c7bd] bg-white px-3 text-sm outline-none focus:border-[#9e6172]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => updateRsvpDraftAttendee(index, { category: "adult" })}
+                                  className={`h-9 rounded-full px-3 text-xs font-bold ${attendee.category === "adult" ? "bg-[#7d1f37] text-white" : "border border-[#d8c7bd] bg-white text-[#684f55]"}`}
+                                >
+                                  Adulto
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateRsvpDraftAttendee(index, { category: "child" })}
+                                  className={`h-9 rounded-full px-3 text-xs font-bold ${attendee.category === "child" ? "bg-[#7d1f37] text-white" : "border border-[#d8c7bd] bg-white text-[#684f55]"}`}
+                                >
+                                  Criança
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={rsvpBusy}
+                                  onClick={() => void removeRsvpAttendee(rsvp, index)}
+                                  className="inline-flex h-9 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold text-red-700 disabled:opacity-50"
+                                >
+                                  <Trash2 className="size-3.5" /> Excluir
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eee4de] pt-4">
+                            <button
+                              type="button"
+                              disabled={rsvpBusy}
+                              onClick={() => void saveRsvpEdit(rsvp.id)}
+                              className="h-9 rounded-full bg-[#7d1f37] px-4 text-xs font-bold text-white disabled:opacity-50"
+                            >
+                              {rsvpBusy ? "Salvando…" : "Salvar alterações"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={rsvpBusy}
+                              onClick={cancelRsvpEdit}
+                              className="h-9 rounded-full border border-[#d8c7bd] bg-white px-4 text-xs font-bold text-[#684f55]"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              disabled={rsvpBusy}
+                              onClick={() => void deleteRsvpSubmission(rsvp)}
+                              className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-3 text-xs font-bold text-red-700 disabled:opacity-50"
+                            >
+                              <Trash2 className="size-3.5" /> Excluir confirmação
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-bold">{rsvp.contact_name}</p>
+                              <p className="mt-1 text-xs text-[#806e72]">{rsvp.whatsapp || "Sem contato"}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startRsvpEdit(rsvp)}
+                                className="inline-flex h-9 items-center gap-1 rounded-full border border-[#d8c7bd] bg-white px-3 text-xs font-bold text-[#684f55]"
+                              >
+                                <Pencil className="size-3.5" /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={rsvpBusy}
+                                onClick={() => void deleteRsvpSubmission(rsvp)}
+                                className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-xs font-bold text-red-700 disabled:opacity-50"
+                              >
+                                <Trash2 className="size-3.5" /> Excluir
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {rsvp.attendees.map((attendee, index) => (
+                              <span
+                                key={`${rsvp.id}-${index}`}
+                                className="inline-flex items-center gap-2 rounded-full bg-[#f5ece7] px-3 py-1 text-xs font-bold text-[#684f55]"
+                              >
+                                {attendee.name} • {attendee.category === "child" ? "Criança" : "Adulto"}
+                                <button
+                                  type="button"
+                                  title={`Excluir ${attendee.name}`}
+                                  disabled={rsvpBusy}
+                                  onClick={() => void removeRsvpAttendee(rsvp, index)}
+                                  className="text-red-700 disabled:opacity-50"
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
                 {rsvps.length === 0 && <p className="text-sm text-[#806e72]">Ainda não há confirmações.</p>}
               </div>
               <h3 className="mt-7 font-display text-xl font-bold">Reservas de presentes</h3>
