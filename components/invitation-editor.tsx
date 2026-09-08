@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Check,
   ExternalLink,
+  FileSpreadsheet,
+  FileText,
   Gift,
   ImagePlus,
   Loader2,
@@ -21,6 +23,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getTheme, LAYOUTS, THEMES } from "@/lib/themes";
 import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
+import { exportAttendancePdf, exportAttendanceXlsx } from "@/lib/attendance-export";
 
 type Tab = "content" | "appearance" | "photo" | "gifts" | "responses";
 
@@ -347,6 +350,16 @@ export function InvitationEditor({
 
   const adults = rsvps.reduce((sum, rsvp) => sum + rsvp.attendees.filter((item) => item.category === "adult").length, 0);
   const children = rsvps.reduce((sum, rsvp) => sum + rsvp.attendees.filter((item) => item.category === "child").length, 0);
+  const totalGuests = adults + children;
+  const attendanceExportPayload = useMemo(() => ({
+    eventTitle: invitation.event_title || "Evento",
+    groups: rsvps.map((rsvp) => ({
+      contactName: rsvp.contact_name,
+      whatsapp: rsvp.whatsapp,
+      createdAt: rsvp.created_at,
+      attendees: rsvp.attendees,
+    })),
+  }), [invitation.event_title, rsvps]);
 
   return (
     <div className="space-y-6">
@@ -506,8 +519,28 @@ export function InvitationEditor({
 
           {tab === "responses" && (
             <div>
-              <SectionTitle title="Confirmações e reservas" description="Acompanhe quem confirmou presença e quais presentes já foram escolhidos." />
-              <div className="mt-5 grid gap-3 sm:grid-cols-3"><Stat label="Confirmações" value={rsvps.length} /><Stat label="Adultos" value={adults} /><Stat label="Crianças" value={children} /></div>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <SectionTitle title="Confirmações e reservas" description="Acompanhe quem confirmou presença e quais presentes já foram escolhidos." />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={totalGuests === 0}
+                    onClick={() => exportAttendancePdf(attendanceExportPayload)}
+                    className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-4 text-sm font-bold text-[#684f55] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileText className="size-4" /> PDF
+                  </button>
+                  <button
+                    type="button"
+                    disabled={totalGuests === 0}
+                    onClick={() => exportAttendanceXlsx(attendanceExportPayload)}
+                    className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-4 text-sm font-bold text-[#684f55] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="size-4" /> XLSX
+                  </button>
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Stat label="Confirmações" value={rsvps.length} /><Stat label="Convidados" value={totalGuests} /><Stat label="Adultos" value={adults} /><Stat label="Crianças" value={children} /></div>
               <h3 className="mt-7 font-display text-xl font-bold">Presenças</h3>
               <div className="mt-3 space-y-3">
                 {rsvps.map((rsvp) => <article key={rsvp.id} className="rounded-2xl border border-[#e1d3cb] bg-white p-4"><p className="font-bold">{rsvp.contact_name}</p><p className="mt-1 text-xs text-[#806e72]">{rsvp.whatsapp || "Sem contato"}</p><div className="mt-3 flex flex-wrap gap-2">{rsvp.attendees.map((attendee, index) => <span key={`${rsvp.id}-${index}`} className="rounded-full bg-[#f5ece7] px-3 py-1 text-xs font-bold text-[#684f55]">{attendee.name} • {attendee.category === "child" ? "Criança" : "Adulto"}</span>)}</div></article>)}

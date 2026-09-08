@@ -57,6 +57,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
   const [rsvpWhatsapp, setRsvpWhatsapp] = useState("");
   const [attendees, setAttendees] = useState<Rsvp["attendees"]>([{ name: "", category: "adult" }]);
   const [includeContactAsAttendee, setIncludeContactAsAttendee] = useState(true);
+  const [rsvpContactCategory, setRsvpContactCategory] = useState<Rsvp["attendees"][number]["category"]>("adult");
   const [message, setMessage] = useState("");
 
   const supabase = useMemo(() => createClient(), []);
@@ -103,12 +104,13 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
       return cleanAttendees;
     }
 
-    return [{ name: contact, category: "adult" }, ...cleanAttendees];
+    return [{ name: contact, category: rsvpContactCategory }, ...cleanAttendees];
   }, [
     cleanAttendees,
     contactAlreadyListed,
     includeContactAsAttendee,
     rsvpContact,
+    rsvpContactCategory,
   ]);
 
   const attendeeSummary = useMemo(
@@ -173,6 +175,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
     setRsvpWhatsapp("");
     setAttendees([{ name: "", category: "adult" }]);
     setIncludeContactAsAttendee(true);
+    setRsvpContactCategory("adult");
     setMessage("Presença confirmada. Nos vemos na festa! 🎉");
   }
 
@@ -267,7 +270,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                         {contactAlreadyListed
                           ? "Este nome já está na lista abaixo e não será duplicado."
                           : includeContactAsAttendee
-                            ? "Será incluído automaticamente como adulto."
+                            ? "Será incluído automaticamente. Escolha abaixo se é adulto ou criança."
                             : "Marque esta opção para incluí-lo automaticamente."}
                       </span>
                     </span>
@@ -303,9 +306,22 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                       </p>
                       <p className="mt-0.5 text-sm font-bold">{rsvpContact.trim()}</p>
                     </div>
-                    <span className="rounded-full bg-[var(--i-soft)] px-3 py-1 text-xs font-bold text-[var(--i-accent)]">
-                      Adulto
-                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRsvpContactCategory("adult")}
+                        className={`h-9 rounded-full border px-3 text-xs font-bold ${rsvpContactCategory === "adult" ? "border-[var(--i-accent)] bg-[var(--i-accent)] text-white" : "border-[var(--i-border)] bg-white"}`}
+                      >
+                        Adulto
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRsvpContactCategory("child")}
+                        className={`h-9 rounded-full border px-3 text-xs font-bold ${rsvpContactCategory === "child" ? "border-[var(--i-accent)] bg-[var(--i-accent)] text-white" : "border-[var(--i-border)] bg-white"}`}
+                      >
+                        Criança
+                      </button>
+                    </div>
                   </div>
                 )}
 
