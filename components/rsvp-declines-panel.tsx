@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Phone, Trash2, UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -45,7 +46,54 @@ export function RsvpDeclinesPanel({
   const [declines, setDeclines] = useState(initialDeclines);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    let currentHost: HTMLElement | null = null;
+
+    function positionPanel() {
+      const headings = Array.from(document.querySelectorAll("h3"));
+      const reservationsHeading = headings.find(
+        (heading) => heading.textContent?.trim() === "Reservas de presentes",
+      );
+
+      if (!reservationsHeading?.parentElement) {
+        setPortalTarget(null);
+        currentHost = null;
+        return;
+      }
+
+      let host = document.getElementById("convniver-rsvp-declines-slot");
+      if (!host) {
+        host = document.createElement("div");
+        host.id = "convniver-rsvp-declines-slot";
+      }
+
+      if (host.parentElement !== reservationsHeading.parentElement || host.nextSibling !== reservationsHeading) {
+        reservationsHeading.parentElement.insertBefore(host, reservationsHeading);
+      }
+
+      currentHost = host;
+      setPortalTarget(host);
+    }
+
+    positionPanel();
+
+    const observer = new MutationObserver(() => {
+      positionPanel();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer.disconnect();
+      if (currentHost?.isConnected) currentHost.remove();
+    };
+  }, []);
 
   async function removeDecline(item: RsvpDecline) {
     if (busyId) return;
@@ -74,15 +122,19 @@ export function RsvpDeclinesPanel({
     setBusyId(null);
   }
 
-  return (
-    <section className="mb-6 overflow-hidden rounded-[1.8rem] border border-[#e4d8d0] bg-[#fffdfa] shadow-[0_12px_40px_rgba(83,48,58,.045)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eee4de] px-5 py-4 sm:px-6">
+  if (!portalTarget) return null;
+
+  return createPortal(
+    <section className="mt-7 border-t border-[#eee4de] pt-7">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#f5ece7] text-[#7d1f37]">
             <UserX className="size-5" />
           </span>
           <div>
-            <h2 className="font-display text-xl font-bold text-[#351820]">Ausências informadas</h2>
+            <h3 className="font-display text-xl font-bold text-[#351820]">
+              Ausências informadas
+            </h3>
             <p className="mt-1 text-sm text-[#806e72]">
               Convidados que usaram a opção “Não poderei comparecer”.
             </p>
@@ -94,64 +146,65 @@ export function RsvpDeclinesPanel({
         </span>
       </div>
 
-      <div className="p-5 sm:p-6">
-        {declines.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d8c7bd] bg-white px-5 py-8 text-center">
-            <UserX className="mx-auto size-7 text-[#a58f95]" />
-            <p className="mt-3 font-bold text-[#594147]">Nenhuma ausência informada até agora.</p>
-            <p className="mt-1 text-sm text-[#806e72]">
-              Quando alguém avisar que não poderá comparecer, o registro aparecerá aqui.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {declines.map((item) => {
-              const waHref = whatsappHref(item.whatsapp);
-              return (
-                <article key={item.id} className="rounded-2xl border border-[#e1d3cb] bg-white p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-[#351820]">{item.contact_name}</p>
-                      <p className="mt-1 text-xs text-[#8b777d]">Informado em {formatDate(item.created_at)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={busyId === item.id}
-                      onClick={() => void removeDecline(item)}
-                      className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      <Trash2 className="size-3.5" /> Excluir
-                    </button>
+      {declines.length === 0 ? (
+        <div className="mt-3 rounded-2xl border border-dashed border-[#d8c7bd] bg-white px-5 py-6 text-center">
+          <UserX className="mx-auto size-6 text-[#a58f95]" />
+          <p className="mt-2 font-bold text-[#594147]">Nenhuma ausência informada.</p>
+          <p className="mt-1 text-sm text-[#806e72]">
+            Quando alguém avisar que não poderá comparecer, o registro aparecerá aqui.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {declines.map((item) => {
+            const waHref = whatsappHref(item.whatsapp);
+            return (
+              <article key={item.id} className="rounded-2xl border border-[#e1d3cb] bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-[#351820]">{item.contact_name}</p>
+                    <p className="mt-1 text-xs text-[#8b777d]">
+                      Informado em {formatDate(item.created_at)}
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    disabled={busyId === item.id}
+                    onClick={() => void removeDecline(item)}
+                    className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" /> Excluir
+                  </button>
+                </div>
 
-                  <div className="mt-3 border-t border-[#f0e7e2] pt-3">
-                    {item.whatsapp ? (
-                      waHref ? (
-                        <a
-                          href={waHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-bold text-[#7d1f37]"
-                        >
-                          <Phone className="size-4" /> {item.whatsapp}
-                        </a>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 text-sm text-[#806e72]">
-                          <Phone className="size-4" /> {item.whatsapp}
-                        </span>
-                      )
+                <div className="mt-3 border-t border-[#f0e7e2] pt-3">
+                  {item.whatsapp ? (
+                    waHref ? (
+                      <a
+                        href={waHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm font-bold text-[#7d1f37]"
+                      >
+                        <Phone className="size-4" /> {item.whatsapp}
+                      </a>
                     ) : (
-                      <span className="text-sm text-[#9a858a]">WhatsApp não informado</span>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+                      <span className="inline-flex items-center gap-2 text-sm text-[#806e72]">
+                        <Phone className="size-4" /> {item.whatsapp}
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-sm text-[#9a858a]">WhatsApp não informado</span>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
-        {message && <p className="mt-4 text-sm font-bold text-[#7c686d]">{message}</p>}
-      </div>
-    </section>
+      {message && <p className="mt-4 text-sm font-bold text-[#7c686d]">{message}</p>}
+    </section>,
+    portalTarget,
   );
 }
