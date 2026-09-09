@@ -21,7 +21,7 @@ jobs:
 
       - name: Validar build
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Commitar alteracoes
