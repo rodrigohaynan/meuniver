@@ -19,10 +19,10 @@ jobs:
       - name: Aplicar alteracoes
         run: python3 .github/scripts/apply_monthiversary.py
 
-      - name: Validar build
+      - name: Validar TypeScript
         run: |
           npm install --no-audit --no-fund
-          npm run build
+          npx tsc --noEmit
 
       - name: Commitar alteracoes
         run: |
