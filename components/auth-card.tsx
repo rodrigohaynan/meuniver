@@ -194,26 +194,37 @@ export function AuthCard() {
 
   const signupFromConfirmation = mode === "signup" && origin === "confirmacao";
 
+  const passwordToggle = (
+    <button
+      type="button"
+      onClick={() => setShowPassword((value) => !value)}
+      className="grid size-8 shrink-0 place-items-center rounded-full text-[#806e72] hover:bg-[#f5ece7]"
+      aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
+    >
+      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+    </button>
+  );
+
   return (
-    <div className="w-full max-w-xl rounded-[2rem] border border-[#dfd0c6] bg-white/95 p-6 shadow-[0_24px_70px_rgba(75,35,47,.12)] sm:p-8">
+    <div className="w-full rounded-[1.8rem] border border-[#dfd0c6] bg-white/95 p-5 shadow-[0_22px_65px_rgba(75,35,47,.11)] sm:p-6 xl:p-7">
       <div className="grid grid-cols-2 rounded-full bg-[#f5ece7] p-1">
         <button
           type="button"
           onClick={() => { setMode("login"); setMessage(""); }}
-          className={`h-10 rounded-full text-sm font-bold transition ${mode === "login" ? "bg-white text-[#6e2037] shadow-sm" : "text-[#806e72]"}`}
+          className={`h-9 rounded-full text-sm font-bold transition ${mode === "login" ? "bg-white text-[#6e2037] shadow-sm" : "text-[#806e72]"}`}
         >
           Entrar
         </button>
         <button
           type="button"
           onClick={() => { setMode("signup"); setMessage(""); }}
-          className={`h-10 rounded-full text-sm font-bold transition ${mode === "signup" ? "bg-white text-[#6e2037] shadow-sm" : "text-[#806e72]"}`}
+          className={`h-9 rounded-full text-sm font-bold transition ${mode === "signup" ? "bg-white text-[#6e2037] shadow-sm" : "text-[#806e72]"}`}
         >
           Criar conta
         </button>
       </div>
 
-      <h1 className="mt-7 font-display text-3xl font-bold text-[#351820]">
+      <h1 className="mt-5 font-display text-2xl font-bold leading-[1.08] text-[#351820] sm:text-[28px]">
         {mode === "login"
           ? "Bem-vindo de volta"
           : signupFromConfirmation
@@ -228,8 +239,8 @@ export function AuthCard() {
             : "Cadastre seus dados para começar a organizar seus próprios convites."}
       </p>
 
-      <form onSubmit={submitEmail} className="mt-6 space-y-4">
-        {mode === "signup" && (
+      <form onSubmit={submitEmail} className="mt-5 space-y-3">
+        {mode === "signup" ? (
           <>
             <Field label="Nome completo" icon={<UserRound className="size-4" />}>
               <input
@@ -237,12 +248,12 @@ export function AuthCard() {
                 onChange={(event) => setFullName(event.target.value)}
                 required
                 autoComplete="name"
-                className="min-w-0 flex-1 outline-none"
+                className="min-w-0 flex-1 bg-transparent outline-none"
                 placeholder="Nome e sobrenome"
               />
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Sexo" icon={<UsersRound className="size-4" />}>
                 <select
                   value={sex}
@@ -265,12 +276,12 @@ export function AuthCard() {
                   onChange={(event) => setBirthDate(event.target.value)}
                   required
                   autoComplete="bday"
-                  className="min-w-0 flex-1 outline-none"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
                 />
               </Field>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Estado" icon={<MapPin className="size-4" />}>
                 <select
                   value={stateUf}
@@ -301,85 +312,103 @@ export function AuthCard() {
               </Field>
             </div>
 
-            <Field label="Celular / WhatsApp" icon={<Phone className="size-4" />}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Celular / WhatsApp" icon={<Phone className="size-4" />}>
+                <input
+                  type="tel"
+                  value={whatsapp}
+                  onChange={(event) => setWhatsapp(formatWhatsapp(event.target.value))}
+                  required
+                  autoComplete="tel"
+                  inputMode="tel"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                  placeholder="(67) 99999-9999"
+                />
+              </Field>
+
+              <Field label="E-mail" icon={<Mail className="size-4" />}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  autoComplete="email"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                  placeholder="voce@email.com"
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Senha" icon={<LockKeyhole className="size-4" />} trailing={passwordToggle}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                  placeholder="••••••••"
+                />
+              </Field>
+
+              <Field label="Confirmar senha" icon={<LockKeyhole className="size-4" />}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                  placeholder="Repita a senha"
+                />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <>
+            <Field label="E-mail" icon={<Mail className="size-4" />}>
               <input
-                type="tel"
-                value={whatsapp}
-                onChange={(event) => setWhatsapp(formatWhatsapp(event.target.value))}
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 required
-                autoComplete="tel"
-                inputMode="tel"
-                className="min-w-0 flex-1 outline-none"
-                placeholder="(67) 99999-9999"
+                autoComplete="email"
+                className="min-w-0 flex-1 bg-transparent outline-none"
+                placeholder="voce@email.com"
               />
             </Field>
+
+            <Field label="Senha" icon={<LockKeyhole className="size-4" />} trailing={passwordToggle}>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={6}
+                autoComplete="current-password"
+                className="min-w-0 flex-1 bg-transparent outline-none"
+                placeholder="••••••••"
+              />
+            </Field>
+
+            <label className="flex cursor-pointer items-center gap-2 pt-1 text-sm text-[#684f55]">
+              <input
+                type="checkbox"
+                checked={rememberUser}
+                onChange={(event) => setRememberUser(event.target.checked)}
+                className="size-4 accent-[#7d1f37]"
+              />
+              Lembrar usuário neste dispositivo
+            </label>
           </>
-        )}
-
-        <Field label="E-mail" icon={<Mail className="size-4" />}>
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-            autoComplete="email"
-            className="min-w-0 flex-1 outline-none"
-            placeholder="voce@email.com"
-          />
-        </Field>
-
-        <Field label="Senha" icon={<LockKeyhole className="size-4" />} trailing={
-          <button
-            type="button"
-            onClick={() => setShowPassword((value) => !value)}
-            className="grid size-8 shrink-0 place-items-center rounded-full text-[#806e72] hover:bg-[#f5ece7]"
-            aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
-          >
-            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
-        }>
-          <input
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={6}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            className="min-w-0 flex-1 outline-none"
-            placeholder="••••••••"
-          />
-        </Field>
-
-        {mode === "signup" && (
-          <Field label="Confirmar senha" icon={<LockKeyhole className="size-4" />}>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-              minLength={6}
-              autoComplete="new-password"
-              className="min-w-0 flex-1 outline-none"
-              placeholder="Repita a senha"
-            />
-          </Field>
-        )}
-
-        {mode === "login" && (
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-[#684f55]">
-            <input
-              type="checkbox"
-              checked={rememberUser}
-              onChange={(event) => setRememberUser(event.target.checked)}
-              className="size-4 accent-[#7d1f37]"
-            />
-            Lembrar usuário neste dispositivo
-          </label>
         )}
 
         <button
           disabled={busy}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f37] font-bold text-white transition hover:bg-[#64172b] disabled:opacity-60"
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f37] font-bold text-white transition hover:bg-[#64172b] disabled:opacity-60"
         >
           {busy && <Loader2 className="size-4 animate-spin" />}
           {mode === "login" ? "Entrar no painel" : "Criar minha conta"}
@@ -387,7 +416,7 @@ export function AuthCard() {
       </form>
 
       {message && (
-        <p className="mt-4 rounded-xl bg-[#fff5ed] px-4 py-3 text-sm leading-5 text-[#77543c]">
+        <p className="mt-3 rounded-xl bg-[#fff5ed] px-4 py-3 text-sm leading-5 text-[#77543c]">
           {message}
         </p>
       )}
@@ -407,10 +436,10 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="text-sm font-bold text-[#594147]">{label}</span>
-      <div className="mt-2 flex min-h-12 items-center gap-2 rounded-xl border border-[#d9cbc3] bg-white px-3 focus-within:border-[#a96b7b] focus-within:ring-2 focus-within:ring-[#a96b7b]/15">
-        <span className="text-[#9b858b]">{icon}</span>
+    <label className="block min-w-0">
+      <span className="text-[13px] font-bold text-[#594147]">{label}</span>
+      <div className="mt-1.5 flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-[#d9cbc3] bg-white px-3 focus-within:border-[#a96b7b] focus-within:ring-2 focus-within:ring-[#a96b7b]/15">
+        <span className="shrink-0 text-[#9b858b]">{icon}</span>
         {children}
         {trailing}
       </div>
