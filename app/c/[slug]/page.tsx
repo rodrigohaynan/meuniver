@@ -8,6 +8,11 @@ import type { GiftItem, Invitation } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
 const getPublishedInvitation = cache(
   async (slug: string): Promise<Invitation | null> => {
     const supabase = await createServerSupabaseClient();
@@ -24,6 +29,31 @@ const getPublishedInvitation = cache(
 );
 
 async function appBaseUrl() {
+  /*
+   * Para prévias sociais, prefira uma URL pública e estável.
+   * No Netlify, URL normalmente aponta para o site de produção.
+   */
+  const candidates = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.URL,
+    process.env.DEPLOY_PRIME_URL,
+  ];
+
+  for (const value of candidates) {
+    const clean = value?.trim();
+
+    if (!clean) continue;
+
+    try {
+      return new URL(clean);
+    } catch {
+      // Tenta a próxima opção.
+    }
+  }
+
+  /*
+   * Fallback para o host real da requisição.
+   */
   const requestHeaders = await headers();
 
   const host =
@@ -41,53 +71,15 @@ async function appBaseUrl() {
     try {
       return new URL(`${protocol}://${host}`);
     } catch {
-      // Continua para as variáveis de ambiente.
-    }
-  }
-
-  const candidates = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.URL,
-    process.env.DEPLOY_PRIME_URL,
-  ];
-
-  for (const value of candidates) {
-    const clean = value?.trim();
-
-    if (!clean) continue;
-
-    try {
-      return new URL(clean);
-    } catch {
-      // Tenta a próxima variável.
+      // Continua para localhost.
     }
   }
 
   return new URL("http://localhost:3000");
 }
 
-function previewVersion(invitation: Invitation) {
-  const source = [
-    invitation.hero_image_url ?? "",
-    invitation.event_title,
-    invitation.host_name,
-    invitation.hero_image_zoom,
-    invitation.hero_image_x,
-    invitation.hero_image_y,
-  ].join("|");
-
-  let hash = 2166136261;
-
-  for (let index = 0; index < source.length; index += 1) {
-    hash ^= source.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return (hash >>> 0).toString(36);
-}
-
 function metadataDescription(invitation: Invitation) {
-  const text = invitation.invitation_text
+  const text = (invitation.invitation_text ?? "")
     .trim()
     .replace(/\s+/g, " ");
 
@@ -97,7 +89,7 @@ function metadataDescription(invitation: Invitation) {
       : text;
   }
 
-  const host = invitation.host_name.trim();
+  const host = (invitation.host_name ?? "").trim();
 
   return host
     ? `Você está convidado para celebrar o aniversário de ${host}. Confirme sua presença pelo CONVNIVER.`
@@ -105,8 +97,8 @@ function metadataDescription(invitation: Invitation) {
 }
 
 function metadataTitle(invitation: Invitation) {
-  const eventTitle = invitation.event_title.trim();
-  const host = invitation.host_name.trim();
+  const eventTitle = (invitation.event_title ?? "").trim();
+  const host = (invitation.host_name ?? "").trim();
 
   if (eventTitle) return eventTitle;
   if (host) return `Aniversário de ${host}`;
@@ -114,12 +106,45 @@ function metadataTitle(invitation: Invitation) {
   return "Convite de aniversário";
 }
 
+function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
+  const clean = value?.trim();
+
+  if (!clean) return null;
+
+  try {
+    return new URL(clean).toString();
+  } catch {
+    try {
+      return new URL(clean, baseUrl).toString();
+    } catch {
+      return null;
+    }
+  }
+}
+
+function getShareVersion(
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  const raw = searchParams.v;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+
+  if (!value) return null;
+
+  /*
+   * Mantém somente caracteres seguros e limita o tamanho.
+   * Ex.: ?v=4
+   */
+  const clean = value.trim().replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 40);
+
+  return clean || null;
+}
+
 export async function generateMetadata({
   params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
+  searchParams,
+}: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  const query = searchParams ? await searchParams : {};
 
   const invitation = await getPublishedInvitation(slug);
 
@@ -137,37 +162,47 @@ export async function generateMetadata({
   const description = metadataDescription(invitation);
   const baseUrl = await appBaseUrl();
 
-  const invitationUrl = new URL(
+  const canonicalUrl = new URL(
     `/c/${encodeURIComponent(slug)}`,
     baseUrl,
-  ).toString();
+  );
 
   /*
-   * A rota real e funcional da miniatura é /og-image.
-   * Ela usa ImageResponse do Next e retorna image/png.
+   * IMPORTANTE:
+   * o parâmetro ?v= passa a fazer parte de og:url.
+   * Assim Instagram/Facebook/WhatsApp recebem uma URL social nova
+   * quando você precisa quebrar o cache da prévia.
    */
-  const previewImageUrl = new URL(
-    `/c/${encodeURIComponent(slug)}/og-image`,
-    baseUrl,
-  );
+  const socialUrl = new URL(canonicalUrl);
+  const shareVersion = getShareVersion(query);
 
-  previewImageUrl.searchParams.set(
-    "v",
-    previewVersion(invitation),
-  );
+  if (shareVersion) {
+    socialUrl.searchParams.set("v", shareVersion);
+  }
 
-  const previewImage = previewImageUrl.toString();
+  /*
+   * CORREÇÃO PRINCIPAL:
+   * usa a imagem pública do convite DIRETAMENTE no og:image.
+   *
+   * Não depende mais de /c/[slug]/og-image, ImageResponse,
+   * outra consulta ao Supabase ou outra função serverless.
+   * Isso deixa a prévia muito mais simples e confiável para crawlers.
+   */
+  const previewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
 
-  const imageAlt = invitation.host_name.trim()
-    ? `Convite de aniversário de ${invitation.host_name.trim()}`
+  const host = (invitation.host_name ?? "").trim();
+  const imageAlt = host
+    ? `Convite de aniversário de ${host}`
     : title;
 
   return {
+    metadataBase: baseUrl,
+
     title: `${title} — CONVNIVER`,
     description,
 
     alternates: {
-      canonical: invitationUrl,
+      canonical: canonicalUrl.toString(),
     },
 
     openGraph: {
@@ -176,33 +211,35 @@ export async function generateMetadata({
       siteName: "CONVNIVER",
       title,
       description,
-      url: invitationUrl,
 
-      images: [
-        {
-          url: previewImage,
-          width: 1200,
-          height: 630,
-          type: "image/png",
-          alt: imageAlt,
-        },
-      ],
+      /*
+       * Não remover o ?v= daqui.
+       * Ele é usado justamente para quebrar cache social.
+       */
+      url: socialUrl.toString(),
+
+      images: previewImage
+        ? [
+            {
+              url: previewImage,
+              alt: imageAlt,
+            },
+          ]
+        : undefined,
     },
 
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [previewImage],
+      images: previewImage ? [previewImage] : undefined,
     },
   };
 }
 
 export default async function PublicInvitationPage({
   params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+}: PageProps) {
   const { slug } = await params;
 
   const invitation = await getPublishedInvitation(slug);
