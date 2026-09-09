@@ -3,16 +3,23 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { InvitationEditor } from "@/components/invitation-editor";
+import { RsvpDeclinesPanel, type RsvpDecline } from "@/components/rsvp-declines-panel";
 import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
 
 export default async function InvitationEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: invitationData }, { data: giftsData }, { data: rsvpsData }] = await Promise.all([
+  const [
+    { data: invitationData },
+    { data: giftsData },
+    { data: rsvpsData },
+    { data: declinesData },
+  ] = await Promise.all([
     supabase.from("invitations").select("*").eq("id", id).single(),
     supabase.from("gifts").select("*").eq("invitation_id", id).order("sort_order"),
     supabase.from("rsvps").select("*").eq("invitation_id", id).order("created_at", { ascending: false }),
+    supabase.from("rsvp_declines").select("*").eq("invitation_id", id).order("created_at", { ascending: false }),
   ]);
 
   if (!invitationData) notFound();
@@ -26,6 +33,7 @@ export default async function InvitationEditorPage({ params }: { params: Promise
   }
 
   const invitation = invitationData as Invitation;
+  const declines = (declinesData ?? []) as RsvpDecline[];
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9">
@@ -36,6 +44,8 @@ export default async function InvitationEditorPage({ params }: { params: Promise
         </div>
         <span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#806e72] shadow-sm">/c/{invitation.slug}</span>
       </div>
+
+      <RsvpDeclinesPanel invitationId={invitation.id} initialDeclines={declines} />
 
       <InvitationEditor
         initialInvitation={invitation}
