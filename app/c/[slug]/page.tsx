@@ -133,16 +133,6 @@ function getShareVersion(
   return clean || null;
 }
 
-function socialImageVersion(invitation: Invitation, shareVersion: string | null) {
-  if (shareVersion) return shareVersion;
-
-  const updated = (invitation.updated_at ?? "")
-    .replace(/[^0-9]/g, "")
-    .slice(0, 20);
-
-  return updated || invitation.id.slice(0, 12);
-}
-
 export async function generateMetadata({
   params,
   searchParams,
@@ -170,37 +160,21 @@ export async function generateMetadata({
   }
 
   /*
-   * Estratégia social do CONVNIVER:
+   * Estratégia social estável do CONVNIVER:
    *
-   * 1) imagem original em primeiro lugar: mantém o comportamento que funciona
-   *    no Instagram;
-   * 2) JPG social 1200x630 em segundo lugar: versão leve e compatível com
-   *    WhatsApp.
+   * 1) imagem original em primeiro lugar: preserva o comportamento do Instagram;
+   * 2) JPEG 1200x630 persistido no Supabase em segundo lugar: o WhatsApp recebe
+   *    um arquivo real, leve e público, sem depender de geração dinâmica durante
+   *    a leitura do crawler.
    *
-   * O convite do Théo mantém o JPG estático já validado. Todos os demais
-   * convites, inclusive os novos, recebem automaticamente uma versão JPG pela
-   * rota /social-preview/[slug].jpg.
+   * O convite do Théo mantém a imagem estática já validada como referência.
    */
   const originalPreviewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
 
-  let whatsappPreviewImage: string | null = null;
-
-  if (slug === "theo-rhaian") {
-    whatsappPreviewImage = new URL(
-      "/social/theo-rhaian-whatsapp.jpg",
-      baseUrl,
-    ).toString();
-  } else if (originalPreviewImage) {
-    const generatedPreview = new URL(
-      `/social-preview/${encodeURIComponent(slug)}.jpg`,
-      baseUrl,
-    );
-    generatedPreview.searchParams.set(
-      "v",
-      socialImageVersion(invitation, shareVersion),
-    );
-    whatsappPreviewImage = generatedPreview.toString();
-  }
+  const whatsappPreviewImage =
+    slug === "theo-rhaian"
+      ? new URL("/social/theo-rhaian-whatsapp.jpg", baseUrl).toString()
+      : absoluteUrl(invitation.share_image_url, baseUrl);
 
   const host = (invitation.host_name ?? "").trim();
   const celebration = celebrationName(invitation);
