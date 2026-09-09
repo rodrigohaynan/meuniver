@@ -193,14 +193,22 @@ export async function generateMetadata({
   }
 
   /*
-   * CORREÇÃO PRINCIPAL:
-   * usa a imagem pública do convite DIRETAMENTE no og:image.
+   * TESTE JPG PARA WHATSAPP:
+   * Para o convite do Théo usamos uma imagem JPG estática, leve e pública,
+   * hospedada corretamente em /public/social.
    *
-   * Não depende mais de /c/[slug]/og-image, ImageResponse,
-   * outra consulta ao Supabase ou outra função serverless.
-   * Isso deixa a prévia muito mais simples e confiável para crawlers.
+   * Arquivo físico:
+   * public/social/theo-rhaian-whatsapp.jpg
+   *
+   * URL pública:
+   * /social/theo-rhaian-whatsapp.jpg
+   *
+   * Para todos os outros convites, mantém a imagem original cadastrada.
    */
-  const previewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
+  const previewImage =
+    slug === "theo-rhaian"
+      ? new URL("/social/theo-rhaian-whatsapp.jpg", baseUrl).toString()
+      : absoluteUrl(invitation.hero_image_url, baseUrl);
 
   const host = (invitation.host_name ?? "").trim();
   const imageAlt = host
@@ -234,6 +242,9 @@ export async function generateMetadata({
         ? [
             {
               url: previewImage,
+              width: 1200,
+              height: 630,
+              type: "image/jpeg",
               alt: imageAlt,
             },
           ]
