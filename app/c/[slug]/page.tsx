@@ -125,16 +125,24 @@ function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
 function getShareVersion(
   searchParams: Record<string, string | string[] | undefined>,
 ) {
-  const raw = searchParams.v;
+  /*
+   * Aceita o parâmetro usado pelo CONVNIVER (?share=...)
+   * e mantém ?v=... por compatibilidade.
+   *
+   * IMPORTANTE:
+   * não muda imagem, título, descrição ou layout.
+   * Apenas faz a URL de compartilhamento realmente variar no og:url,
+   * permitindo quebrar o cache social sem alterar o convite.
+   */
+  const raw = searchParams.share ?? searchParams.v;
   const value = Array.isArray(raw) ? raw[0] : raw;
 
   if (!value) return null;
 
-  /*
-   * Mantém somente caracteres seguros e limita o tamanho.
-   * Ex.: ?v=4
-   */
-  const clean = value.trim().replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 40);
+  const clean = value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, "")
+    .slice(0, 50);
 
   return clean || null;
 }
@@ -177,7 +185,11 @@ export async function generateMetadata({
   const shareVersion = getShareVersion(query);
 
   if (shareVersion) {
-    socialUrl.searchParams.set("v", shareVersion);
+    /*
+     * Usa "share" no og:url porque é o mesmo parâmetro
+     * utilizado pelo link que já funciona no Instagram.
+     */
+    socialUrl.searchParams.set("share", shareVersion);
   }
 
   /*
