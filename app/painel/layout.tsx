@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/logout-button";
@@ -10,6 +11,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
+
+  const displayName = String(user.user_metadata?.full_name ?? "").trim();
 
   return (
     <main className="min-h-screen bg-[#f8f4f1]">
@@ -25,8 +28,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
               priority
             />
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden max-w-56 truncate text-sm text-[#806e72] sm:block">{user.email}</span>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden max-w-44 truncate text-sm text-[#806e72] lg:block">
+              {displayName || user.email}
+            </span>
+            <Link
+              href="/painel/minha-conta"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[#dccdc5] bg-white px-3 text-sm font-bold text-[#684f55] transition hover:bg-[#fff9f5] sm:px-4"
+            >
+              <UserRound className="size-4" />
+              <span className="hidden sm:inline">Minha conta</span>
+            </Link>
             <LogoutButton />
           </div>
         </div>
