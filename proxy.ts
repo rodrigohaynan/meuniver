@@ -7,6 +7,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // /c/* é público. Não deve passar pela renovação de sessão do Supabase,
+    // porque crawlers do WhatsApp/Facebook/Instagram não precisam de login e
+    // podem desistir da prévia se houver uma chamada extra de autenticação.
+    "/((?!_next/static|_next/image|favicon.ico|c(?:/|$)|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
