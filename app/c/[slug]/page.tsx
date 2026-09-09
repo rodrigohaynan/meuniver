@@ -29,6 +29,10 @@ const getPublishedInvitation = cache(
 );
 
 async function appBaseUrl() {
+  /*
+   * Para prévias sociais, prefira uma URL pública e estável.
+   * No Netlify, URL normalmente aponta para o site de produção.
+   */
   const candidates = [
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.URL,
@@ -47,6 +51,9 @@ async function appBaseUrl() {
     }
   }
 
+  /*
+   * Fallback para o host real da requisição.
+   */
   const requestHeaders = await headers();
 
   const host =
@@ -99,10 +106,7 @@ function metadataTitle(invitation: Invitation) {
   return "Convite de aniversário";
 }
 
-function absoluteUrl(
-  value: string | null | undefined,
-  baseUrl: URL,
-) {
+function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
   const clean = value?.trim();
 
   if (!clean) return null;
@@ -118,19 +122,19 @@ function absoluteUrl(
   }
 }
 
-function firstParam(
-  value: string | string[] | undefined,
+function getShareVersion(
+  searchParams: Record<string, string | string[] | undefined>,
 ) {
-  return Array.isArray(value) ? value[0] : value;
-}
+  const raw = searchParams.v;
+  const value = Array.isArray(raw) ? raw[0] : raw;
 
-function safeParam(value: string | undefined) {
   if (!value) return null;
 
-  const clean = value
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]/g, "")
-    .slice(0, 50);
+  /*
+   * Mantém somente caracteres seguros e limita o tamanho.
+   * Ex.: ?v=4
+   */
+  const clean = value.trim().replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 40);
 
   return clean || null;
 }
@@ -164,43 +168,29 @@ export async function generateMetadata({
   );
 
   /*
-   * Aceita o parâmetro já usado nos seus testes:
-   * ?share=v6-1, ?share=wa-v7-1 etc.
-   * Também aceita ?v= por compatibilidade.
+   * IMPORTANTE:
+   * o parâmetro ?v= passa a fazer parte de og:url.
+   * Assim Instagram/Facebook/WhatsApp recebem uma URL social nova
+   * quando você precisa quebrar o cache da prévia.
    */
-  const share = safeParam(firstParam(query.share));
-  const version = safeParam(firstParam(query.v));
-
   const socialUrl = new URL(canonicalUrl);
+  const shareVersion = getShareVersion(query);
 
-  if (share) {
-    socialUrl.searchParams.set("share", share);
-  } else if (version) {
-    socialUrl.searchParams.set("v", version);
+  if (shareVersion) {
+    socialUrl.searchParams.set("v", shareVersion);
   }
 
   /*
-   * TESTE CONTROLADO DO WHATSAPP PARA O THÉO:
-   * usa JPEG 1200x630 com ~127 KB hospedado no MESMO domínio.
-   * Evita PNG de vários MB e evita depender de storage externo.
+   * CORREÇÃO PRINCIPAL:
+   * usa a imagem pública do convite DIRETAMENTE no og:image.
+   *
+   * Não depende mais de /c/[slug]/og-image, ImageResponse,
+   * outra consulta ao Supabase ou outra função serverless.
+   * Isso deixa a prévia muito mais simples e confiável para crawlers.
    */
-  const theoWhatsappImage =
-    slug === "theo-rhaian"
-      ? new URL(
-          "/social/theo-rhaian-whatsapp.jpg",
-          baseUrl,
-        ).toString()
-      : null;
-
-  const heroImage = absoluteUrl(
-    invitation.hero_image_url,
-    baseUrl,
-  );
-
-  const previewImage = theoWhatsappImage ?? heroImage;
+  const previewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
 
   const host = (invitation.host_name ?? "").trim();
-
   const imageAlt = host
     ? `Convite de aniversário de ${host}`
     : title;
@@ -221,15 +211,17 @@ export async function generateMetadata({
       siteName: "CONVNIVER",
       title,
       description,
+
+      /*
+       * Não remover o ?v= daqui.
+       * Ele é usado justamente para quebrar cache social.
+       */
       url: socialUrl.toString(),
 
       images: previewImage
         ? [
             {
               url: previewImage,
-              width: 1200,
-              height: 630,
-              type: "image/jpeg",
               alt: imageAlt,
             },
           ]
@@ -240,9 +232,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: previewImage
-        ? [previewImage]
-        : undefined,
+      images: previewImage ? [previewImage] : undefined,
     },
   };
 }
