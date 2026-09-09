@@ -21,6 +21,7 @@ export type Invitation = {
   theme_key: string;
   layout_key: LayoutKey;
   hero_image_url: string | null;
+  share_image_url: string | null;
   hero_image_zoom: number;
   hero_image_x: number;
   hero_image_y: number;
