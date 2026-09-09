@@ -37,8 +37,9 @@ type RsvpEditDraft = {
 const PHOTO_ZOOM_MIN = 1;
 const PHOTO_ZOOM_MAX = 2.5;
 
-function formatAge(age: number) {
+function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {
   const value = Math.max(1, Math.round(Number(age) || 1));
+  if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;
   return `${value} ${value === 1 ? "ano" : "anos"}`;
 }
 
@@ -77,6 +78,7 @@ export function InvitationEditor({
     hero_image_zoom: initialInvitation.hero_image_zoom ?? 1,
     hero_image_x: initialInvitation.hero_image_x ?? 50,
     hero_image_y: initialInvitation.hero_image_y ?? 50,
+    age_unit: initialInvitation.age_unit ?? "years",
   });
   const [gifts, setGifts] = useState(initialGifts.map((gift) => ({ ...gift, suggestion_image_url: gift.suggestion_image_url ?? null })));
   const [rsvps, setRsvps] = useState(initialRsvps);
@@ -104,7 +106,8 @@ export function InvitationEditor({
         status: invitation.status,
         event_title: invitation.event_title.trim(),
         host_name: invitation.host_name.trim(),
-        age: Math.max(1, Math.min(120, Math.round(invitation.age || 1))),
+        age: Math.max(1, Math.min(invitation.age_unit === "months" ? 12 : 120, Math.round(invitation.age || 1))),
+        age_unit: invitation.age_unit,
         event_date: invitation.event_date || null,
         event_time: invitation.event_time,
         location_name: invitation.location_name.trim(),
@@ -571,7 +574,37 @@ export function InvitationEditor({
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <Field label="Título do convite"><Input value={invitation.event_title} onChange={(value) => setInvitation({ ...invitation, event_title: value })} /></Field>
                 <Field label="Aniversariante"><Input value={invitation.host_name} onChange={(value) => setInvitation({ ...invitation, host_name: value })} /></Field>
-                <Field label="Idade"><Input type="number" value={String(invitation.age)} onChange={(value) => setInvitation({ ...invitation, age: Number(value) })} /></Field>
+                <Field label="Tipo de comemoração">
+                  <select
+                    value={invitation.age_unit}
+                    onChange={(event) => {
+                      const nextUnit = event.target.value as Invitation["age_unit"];
+                      const genericTitle = /^(Aniversário|Mêsversário) de /i.test(invitation.event_title);
+                      setInvitation({
+                        ...invitation,
+                        age_unit: nextUnit,
+                        age: Math.max(1, Math.min(nextUnit === "months" ? 12 : 120, invitation.age)),
+                        event_title: genericTitle
+                          ? `${nextUnit === "months" ? "Mêsversário" : "Aniversário"} de ${invitation.host_name}`
+                          : invitation.event_title,
+                      });
+                    }}
+                    className="h-11 w-full rounded-xl border border-[#d8c7bd] bg-white px-3 text-sm outline-none focus:border-[#9e6172]"
+                  >
+                    <option value="years">Aniversário</option>
+                    <option value="months">Mêsversário</option>
+                  </select>
+                </Field>
+                <Field label={invitation.age_unit === "months" ? "Meses" : "Idade"}>
+                  <Input
+                    type="number"
+                    value={String(invitation.age)}
+                    onChange={(value) => setInvitation({
+                      ...invitation,
+                      age: Math.max(1, Math.min(invitation.age_unit === "months" ? 12 : 120, Number(value) || 1)),
+                    })}
+                  />
+                </Field>
                 <Field label="Data"><Input type="date" value={invitation.event_date ?? ""} onChange={(value) => setInvitation({ ...invitation, event_date: value })} /></Field>
                 <Field label="Horário"><Input type="time" value={invitation.event_time} onChange={(value) => setInvitation({ ...invitation, event_time: value })} /></Field>
                 <Field label="Local"><Input value={invitation.location_name} onChange={(value) => setInvitation({ ...invitation, location_name: value })} /></Field>
@@ -884,7 +917,7 @@ function MiniPreview({ invitation }: { invitation: Invitation }) {
       <div className={`px-6 py-7 sm:px-10 ${invitation.layout_key === "modern" ? "text-left" : "text-center"}`}>
         <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[var(--p-accent)]">Você está convidado</p>
         <h3 className="mt-2 font-display text-3xl font-bold text-[var(--p-text)] sm:text-4xl">{invitation.event_title || "Seu aniversário"}</h3>
-        <p className="mt-2 text-sm font-semibold text-[var(--p-muted)]">{formatAge(invitation.age)} {invitation.event_date ? `• ${new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR")}` : ""}</p>
+        <p className="mt-2 text-sm font-semibold text-[var(--p-muted)]">{formatAge(invitation.age, invitation.age_unit ?? "years")} {invitation.event_date ? `• ${new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR")}` : ""}</p>
         <p className={`mt-4 text-sm leading-6 text-[var(--p-muted)] ${invitation.layout_key === "modern" ? "max-w-2xl" : "mx-auto max-w-2xl"}`}>{invitation.invitation_text}</p>
       </div>
     </div>

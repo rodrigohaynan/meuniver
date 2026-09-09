@@ -3,8 +3,9 @@ import { ArrowUpRight, CalendarDays, CircleDollarSign, Plus, Settings2 } from "l
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
 
-function formatAge(age: number) {
+function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {
   const value = Math.max(1, Math.round(Number(age) || 1));
+  if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;
   return `${value} ${value === 1 ? "ano" : "anos"}`;
 }
 
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
         <div>
           <p className="text-sm font-bold uppercase tracking-[.16em] text-[#9a7438]">Painel</p>
           <h1 className="mt-2 font-display text-4xl font-bold text-[#351820]">Meus convites</h1>
-          <p className="mt-2 text-[#78666b]">Crie, personalize, publique e acompanhe seus aniversários.</p>
+          <p className="mt-2 text-[#78666b]">Crie, personalize, publique e acompanhe aniversários e mêsversários.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/painel/pagamentos" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-5 font-bold text-[#684f55]">
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
           {invitations.map((invitation) => (
             <article key={invitation.id} className="overflow-hidden rounded-[1.7rem] border border-[#e1d3cb] bg-white shadow-sm">
               <div className="h-36 bg-[#f3e8e2]" style={invitation.hero_image_url ? { backgroundImage: `url("${invitation.hero_image_url}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
-                {!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">🎂</div>}
+                {!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">{invitation.age_unit === "months" ? "🍼" : "🎂"}</div>}
               </div>
               <div className="p-5">
                 <div className="flex items-center justify-between gap-2">
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
                   <span className="text-xs font-bold text-[#9a858a]">{invitation.event_date ? new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR") : "Sem data"}</span>
                 </div>
                 <h2 className="mt-4 font-display text-2xl font-bold text-[#3a1d25]">{invitation.event_title}</h2>
-                <p className="mt-1 text-sm text-[#806e72]">{invitation.host_name} • {formatAge(invitation.age)}</p>
+                <p className="mt-1 text-sm text-[#806e72]">{invitation.host_name} • {formatAge(invitation.age, invitation.age_unit ?? "years")}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href={`/painel/convites/${invitation.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white"><Settings2 className="size-4" /> Editar</Link>
                   {invitation.status === "published" && (

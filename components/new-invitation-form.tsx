@@ -20,6 +20,7 @@ export function NewInvitationForm() {
   const router = useRouter();
   const [templateKey, setTemplateKey] = useState(TEMPLATES[0].key);
   const [hostName, setHostName] = useState("");
+  const [ageUnit, setAgeUnit] = useState<"years" | "months">("years");
   const [age, setAge] = useState(30);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +37,8 @@ export function NewInvitationForm() {
 
       const template = TEMPLATES.find((item) => item.key === templateKey) ?? TEMPLATES[0];
       const suffix = Math.random().toString(36).slice(2, 6);
-      const slug = `${slugify(hostName) || "aniversario"}-${suffix}`;
+      const prefix = ageUnit === "months" ? "mesversario" : "aniversario";
+      const slug = `${prefix}-${slugify(hostName) || "convite"}-${suffix}`;
 
       const { data, error: insertError } = await supabase
         .from("invitations")
@@ -44,15 +46,18 @@ export function NewInvitationForm() {
           owner_id: user.id,
           slug,
           status: "draft",
-          event_title: `Aniversário de ${hostName.trim()}`,
+          event_title: `${ageUnit === "months" ? "Mêsversário" : "Aniversário"} de ${hostName.trim()}`,
           host_name: hostName.trim(),
-          age: Math.max(1, Math.min(120, Math.round(age || 1))),
+          age: Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Math.round(age || 1))),
+          age_unit: ageUnit,
           event_date: null,
           event_time: "",
           location_name: "",
           address: "",
           maps_url: "",
-          invitation_text: "Vamos celebrar juntos! Sua presença vai deixar esse dia ainda mais especial.",
+          invitation_text: ageUnit === "months"
+            ? "Vamos celebrar mais um mês de vida! Sua presença vai deixar esse momento ainda mais especial."
+            : "Vamos celebrar juntos! Sua presença vai deixar esse dia ainda mais especial.",
           rsvp_note: "Confirme todas as pessoas que irão com você e informe se são adultos ou crianças.",
           theme_key: template.theme,
           layout_key: template.layout,
@@ -83,15 +88,37 @@ export function NewInvitationForm() {
         ))}
       </div>
 
-      <div className="mt-6 grid gap-4 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:grid-cols-[1fr_160px] sm:p-6">
+      <div className="mt-6 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
+        <p className="text-sm font-bold text-[#594147]">Tipo de comemoração</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => { setAgeUnit("years"); setAge((value) => Math.max(1, value)); }}
+            className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "years" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}
+          >
+            <strong className="block text-[#3c2028]">Aniversário</strong>
+            <span className="mt-1 block text-xs text-[#806e72]">Idade em anos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAgeUnit("months"); setAge((value) => Math.max(1, Math.min(12, value > 12 ? 1 : value))); }}
+            className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "months" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}
+          >
+            <strong className="block text-[#3c2028]">Mêsversário</strong>
+            <span className="mt-1 block text-xs text-[#806e72]">De 1 a 12 meses, ideal para o primeiro ano</span>
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_160px]">
         <label>
           <span className="text-sm font-bold text-[#594147]">Nome do aniversariante</span>
           <input value={hostName} onChange={(event) => setHostName(event.target.value)} maxLength={80} placeholder="Ex.: Liene, Sofia, Miguel..." className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172] focus:ring-2 focus:ring-[#9e6172]/10" />
         </label>
         <label>
-          <span className="text-sm font-bold text-[#594147]">Idade</span>
-          <input type="number" min={1} max={120} value={age} onChange={(event) => setAge(Number(event.target.value))} className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
+          <span className="text-sm font-bold text-[#594147]">{ageUnit === "months" ? "Meses" : "Idade"}</span>
+          <input type="number" min={1} max={ageUnit === "months" ? 12 : 120} value={age} onChange={(event) => setAge(Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Number(event.target.value) || 1)))} className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
         </label>
+        </div>
       </div>
 
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}

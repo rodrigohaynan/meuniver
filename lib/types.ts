@@ -1,4 +1,5 @@
 export type InvitationStatus = "draft" | "published";
+export type AgeUnit = "years" | "months";
 export type LayoutKey = "elegant" | "modern" | "kids";
 
 export type Invitation = {
@@ -9,6 +10,7 @@ export type Invitation = {
   event_title: string;
   host_name: string;
   age: number;
+  age_unit: AgeUnit;
   event_date: string | null;
   event_time: string;
   location_name: string;

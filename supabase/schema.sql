@@ -11,6 +11,7 @@ create table if not exists public.invitations (
   event_title text not null default 'Meu aniversário',
   host_name text not null default '',
   age integer not null default 1 check (age between 1 and 120),
+  age_unit text not null default 'years' check (age_unit in ('years','months')),
   event_date date,
   event_time text not null default '',
   location_name text not null default '',
