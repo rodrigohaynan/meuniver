@@ -8,32 +8,36 @@ import type { GiftItem, Invitation } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const getPublishedInvitation = cache(async (slug: string): Promise<Invitation | null> => {
-  const supabase = await createServerSupabaseClient();
+const getPublishedInvitation = cache(
+  async (slug: string): Promise<Invitation | null> => {
+    const supabase = await createServerSupabaseClient();
 
-  const { data } = await supabase
-    .from("invitations")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
+    const { data } = await supabase
+      .from("invitations")
+      .select("*")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle();
 
-  return (data as Invitation | null) ?? null;
-});
+    return (data as Invitation | null) ?? null;
+  },
+);
 
 async function appBaseUrl() {
-  // Para previews sociais, use primeiro o host REAL da requisição.
-  // Isso evita og:image apontando para localhost, domínio antigo ou URL de deploy
-  // quando NEXT_PUBLIC_APP_URL estiver ausente/desatualizada no Netlify.
   const requestHeaders = await headers();
+
   const host =
     requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim() ||
     requestHeaders.get("host")?.trim();
+
   const forwardedProto =
     requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim();
 
   if (host) {
-    const protocol = forwardedProto || (host.includes("localhost") ? "http" : "https");
+    const protocol =
+      forwardedProto ||
+      (host.includes("localhost") ? "http" : "https");
+
     try {
       return new URL(`${protocol}://${host}`);
     } catch {
@@ -49,12 +53,13 @@ async function appBaseUrl() {
 
   for (const value of candidates) {
     const clean = value?.trim();
+
     if (!clean) continue;
 
     try {
       return new URL(clean);
     } catch {
-      // Tenta a próxima variável disponível.
+      // Tenta a próxima variável.
     }
   }
 
@@ -72,6 +77,7 @@ function previewVersion(invitation: Invitation) {
   ].join("|");
 
   let hash = 2166136261;
+
   for (let index = 0; index < source.length; index += 1) {
     hash ^= source.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
@@ -81,13 +87,18 @@ function previewVersion(invitation: Invitation) {
 }
 
 function metadataDescription(invitation: Invitation) {
-  const text = invitation.invitation_text.trim().replace(/\s+/g, " ");
+  const text = invitation.invitation_text
+    .trim()
+    .replace(/\s+/g, " ");
 
   if (text) {
-    return text.length > 180 ? `${text.slice(0, 177).trimEnd()}...` : text;
+    return text.length > 180
+      ? `${text.slice(0, 177).trimEnd()}...`
+      : text;
   }
 
   const host = invitation.host_name.trim();
+
   return host
     ? `Você está convidado para celebrar o aniversário de ${host}. Confirme sua presença pelo CONVNIVER.`
     : "Você está convidado para uma celebração especial. Confirme sua presença pelo CONVNIVER.";
@@ -99,6 +110,7 @@ function metadataTitle(invitation: Invitation) {
 
   if (eventTitle) return eventTitle;
   if (host) return `Aniversário de ${host}`;
+
   return "Convite de aniversário";
 }
 
@@ -108,6 +120,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+
   const invitation = await getPublishedInvitation(slug);
 
   if (!invitation) {
@@ -123,16 +136,26 @@ export async function generateMetadata({
   const title = metadataTitle(invitation);
   const description = metadataDescription(invitation);
   const baseUrl = await appBaseUrl();
-  const invitationUrl = new URL(`/c/${encodeURIComponent(slug)}`, baseUrl).toString();
 
-  // Usa uma URL com extensão .jpg. Além de ser mais compatível com crawlers
-  // sociais, essa rota fica fora do proxy de autenticação e evita uma chamada
-  // desnecessária ao Supabase antes de o robô baixar a miniatura.
+  const invitationUrl = new URL(
+    `/c/${encodeURIComponent(slug)}`,
+    baseUrl,
+  ).toString();
+
+  /*
+   * A rota real e funcional da miniatura é /og-image.
+   * Ela usa ImageResponse do Next e retorna image/png.
+   */
   const previewImageUrl = new URL(
-    `/c/${encodeURIComponent(slug)}/og-image.jpg`,
+    `/c/${encodeURIComponent(slug)}/og-image`,
     baseUrl,
   );
-  previewImageUrl.searchParams.set("v", previewVersion(invitation));
+
+  previewImageUrl.searchParams.set(
+    "v",
+    previewVersion(invitation),
+  );
+
   const previewImage = previewImageUrl.toString();
 
   const imageAlt = invitation.host_name.trim()
@@ -142,9 +165,11 @@ export async function generateMetadata({
   return {
     title: `${title} — CONVNIVER`,
     description,
+
     alternates: {
       canonical: invitationUrl,
     },
+
     openGraph: {
       type: "website",
       locale: "pt_BR",
@@ -152,16 +177,18 @@ export async function generateMetadata({
       title,
       description,
       url: invitationUrl,
+
       images: [
         {
           url: previewImage,
           width: 1200,
           height: 630,
-          type: "image/jpeg",
+          type: "image/png",
           alt: imageAlt,
         },
       ],
     },
+
     twitter: {
       card: "summary_large_image",
       title,
@@ -177,11 +204,15 @@ export default async function PublicInvitationPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
   const invitation = await getPublishedInvitation(slug);
 
-  if (!invitation) notFound();
+  if (!invitation) {
+    notFound();
+  }
 
   const supabase = await createServerSupabaseClient();
+
   const { data: giftsData } = await supabase
     .from("gifts")
     .select("*")
