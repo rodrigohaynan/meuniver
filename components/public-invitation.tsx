@@ -1,7 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
-import { CalendarDays, ExternalLink, Gift, MapPin, Search, Sparkles, UsersRound } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  CircleDollarSign,
+  Clipboard,
+  ExternalLink,
+  Gift,
+  Loader2,
+  MapPin,
+  Search,
+  Sparkles,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
 import type { GiftItem, Invitation, Rsvp } from "@/lib/types";
@@ -30,7 +50,7 @@ function suggestionImageProxyUrl(giftId: string, suggestionUrl: string) {
 }
 
 function isStoredSuggestionImage(value: string | null) {
-  return Boolean(value?.includes('/storage/v1/object/public/invite-media/'));
+  return Boolean(value?.includes("/storage/v1/object/public/invite-media/"));
 }
 
 function formatAge(age: number) {
@@ -42,6 +62,25 @@ function normalizePersonName(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 }
 
+function digits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function formatCpf(value: string) {
+  const clean = digits(value).slice(0, 11);
+  return clean
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value || 0);
+}
+
 type DuplicateInfo = {
   submittedName: string;
   existingName: string;
@@ -50,24 +89,74 @@ type DuplicateInfo = {
   matchType?: "exact" | "first-name";
 };
 
-export function PublicInvitation({ initialInvitation, initialGifts }: { initialInvitation: Invitation; initialGifts: GiftItem[] }) {
+type PixGiftData = {
+  giftId: string;
+  paymentId: string;
+  status: string;
+  amount: number;
+  platformFee: number;
+  qrCode: string | null;
+  qrCodeBase64: string | null;
+  ticketUrl: string | null;
+};
+
+export function PublicInvitation({
+  initialInvitation,
+  initialGifts,
+}: {
+  initialInvitation: Invitation;
+  initialGifts: GiftItem[];
+}) {
   const invitation = {
     ...initialInvitation,
     hero_image_zoom: initialInvitation.hero_image_zoom ?? 1,
     hero_image_x: initialInvitation.hero_image_x ?? 50,
     hero_image_y: initialInvitation.hero_image_y ?? 50,
+    pix_gift_enabled: initialInvitation.pix_gift_enabled ?? true,
   };
-  const [gifts, setGifts] = useState(initialGifts.map((gift) => ({ ...gift, suggestion_image_url: gift.suggestion_image_url ?? null })));
+
+  const [gifts, setGifts] = useState(
+    initialGifts.map((gift) => ({
+      ...gift,
+      suggestion_image_url: gift.suggestion_image_url ?? null,
+    })),
+  );
   const [reservationGift, setReservationGift] = useState<GiftItem | null>(null);
   const [guestName, setGuestName] = useState("");
   const [guestContact, setGuestContact] = useState("");
+
   const [rsvpContact, setRsvpContact] = useState("");
   const [rsvpWhatsapp, setRsvpWhatsapp] = useState("");
-  const [attendees, setAttendees] = useState<Rsvp["attendees"]>([{ name: "", category: "adult" }]);
+  const [attendees, setAttendees] = useState<Rsvp["attendees"]>([
+    { name: "", category: "adult" },
+  ]);
   const [includeContactAsAttendee, setIncludeContactAsAttendee] = useState(true);
-  const [rsvpContactCategory, setRsvpContactCategory] = useState<Rsvp["attendees"][number]["category"]>("adult");
+  const [rsvpContactCategory, setRsvpContactCategory] = useState<
+    Rsvp["attendees"][number]["category"]
+  >("adult");
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [showRsvpSuccess, setShowRsvpSuccess] = useState(false);
   const [message, setMessage] = useState("");
+
+  const [showDecline, setShowDecline] = useState(false);
+  const [declineName, setDeclineName] = useState("");
+  const [declineWhatsapp, setDeclineWhatsapp] = useState("");
+  const [declineBusy, setDeclineBusy] = useState(false);
+  const [declineDone, setDeclineDone] = useState(false);
+  const [declineMessage, setDeclineMessage] = useState("");
+
+  const [pixGiftAvailable, setPixGiftAvailable] = useState(false);
+  const [showPixGift, setShowPixGift] = useState(false);
+  const [pixGuestName, setPixGuestName] = useState("");
+  const [pixGuestEmail, setPixGuestEmail] = useState("");
+  const [pixGuestWhatsapp, setPixGuestWhatsapp] = useState("");
+  const [pixCpf, setPixCpf] = useState("");
+  const [pixAmount, setPixAmount] = useState("50");
+  const [pixBusy, setPixBusy] = useState(false);
+  const [pixError, setPixError] = useState("");
+  const [pixData, setPixData] = useState<PixGiftData | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const [pixApproved, setPixApproved] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
   const theme = getTheme(invitation.theme_key);
@@ -81,6 +170,46 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
     "--i-soft": theme.colors.accentSoft,
     "--i-border": theme.colors.border,
   } as CSSProperties;
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkPixAvailability() {
+      if (!invitation.pix_gift_enabled) return;
+      const { data, error } = await supabase.rpc("pix_gift_status_public", {
+        p_invitation_id: invitation.id,
+      });
+      if (!active || error) return;
+      const result = data as { available?: boolean } | null;
+      setPixGiftAvailable(Boolean(result?.available));
+    }
+
+    void checkPixAvailability();
+    return () => { active = false; };
+  }, [invitation.id, invitation.pix_gift_enabled, supabase]);
+
+  useEffect(() => {
+    if (!pixData?.giftId || pixApproved) return;
+
+    const timer = window.setInterval(async () => {
+      try {
+        const response = await fetch(`/api/pix-gifts/${encodeURIComponent(pixData.giftId)}/status`, {
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return;
+
+        if (data.status) {
+          setPixData((current) => current ? { ...current, status: data.status } : current);
+        }
+        if (data.approved) setPixApproved(true);
+      } catch {
+        // A consulta automática tenta novamente no próximo ciclo.
+      }
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [pixData?.giftId, pixApproved]);
 
   const cleanAttendees = useMemo(
     () =>
@@ -96,7 +225,6 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
   const contactAlreadyListed = useMemo(() => {
     const normalizedContact = normalizePersonName(rsvpContact);
     if (normalizedContact.length < 2) return false;
-
     return cleanAttendees.some(
       (item) => normalizePersonName(item.name) === normalizedContact,
     );
@@ -104,15 +232,9 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
 
   const effectiveAttendees = useMemo<Rsvp["attendees"]>(() => {
     const contact = rsvpContact.trim().replace(/\s+/g, " ");
-
-    if (
-      !includeContactAsAttendee ||
-      contact.length < 2 ||
-      contactAlreadyListed
-    ) {
+    if (!includeContactAsAttendee || contact.length < 2 || contactAlreadyListed) {
       return cleanAttendees;
     }
-
     return [{ name: contact, category: rsvpContactCategory }, ...cleanAttendees];
   }, [
     cleanAttendees,
@@ -131,31 +253,37 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
     [effectiveAttendees],
   );
 
-  const maxManualAttendees =
-    includeContactAsAttendee && !contactAlreadyListed ? 11 : 12;
+  const maxManualAttendees = includeContactAsAttendee && !contactAlreadyListed ? 11 : 12;
 
   async function reserveGift(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!reservationGift) return;
     setMessage("");
+
     const { data, error } = await supabase.rpc("reserve_gift_public", {
       p_gift_id: reservationGift.id,
       p_guest_name: guestName.trim(),
       p_guest_contact: guestContact.trim(),
     });
     const result = data as { ok?: boolean; error?: string } | null;
+
     if (error || !result?.ok) {
       setMessage(error?.message ?? result?.error ?? "Esse presente não está mais disponível.");
       return;
     }
-    setGifts((items) => items.map((item) => item.id === reservationGift.id ? { ...item, reserved: true } : item));
+
+    setGifts((items) =>
+      items.map((item) => item.id === reservationGift.id ? { ...item, reserved: true } : item),
+    );
     setReservationGift(null);
     setGuestName("");
     setGuestContact("");
     setMessage("Presente reservado. Obrigado! 🎁");
   }
 
-  async function performRsvpSubmit(allowDuplicate = false): Promise<"saved" | "cancelled"> {
+  async function performRsvpSubmit(
+    allowDuplicate = false,
+  ): Promise<"saved" | "cancelled"> {
     const { data, error } = await supabase.rpc("submit_rsvp_public", {
       p_invitation_id: invitation.id,
       p_contact_name: rsvpContact.trim(),
@@ -181,26 +309,20 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
           }
           return `• ${item.submittedName}: possível duplicidade. Já existe ${item.existingName}, adicionado(a) por ${item.contactName}.`;
         }
-
         if (item.rsvpId === "current") {
           return `• ${item.submittedName}: o nome aparece duas vezes nesta mesma confirmação.`;
         }
-
         return `• ${item.submittedName}: pessoa com nome igual já foi adicionada por ${item.contactName}.`;
       });
 
       const proceed = window.confirm(
         `ATENÇÃO — POSSÍVEL DUPLICIDADE\n\n${lines.join("\n")}\n\nSe forem pessoas diferentes, toque em OK para confirmar mesmo assim. Caso contrário, toque em Cancelar e corrija a lista.`,
       );
-
       if (!proceed) return "cancelled";
       return performRsvpSubmit(true);
     }
 
-    if (!result?.ok) {
-      throw new Error(result?.error ?? "Não foi possível confirmar a presença.");
-    }
-
+    if (!result?.ok) throw new Error(result?.error ?? "Não foi possível confirmar a presença.");
     return "saved";
   }
 
@@ -212,7 +334,6 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
       setMessage("Informe o responsável e pelo menos uma pessoa confirmada.");
       return;
     }
-
     if (effectiveAttendees.length > 12) {
       setMessage("A confirmação pode ter no máximo 12 pessoas.");
       return;
@@ -233,7 +354,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
       setAttendees([{ name: "", category: "adult" }]);
       setIncludeContactAsAttendee(true);
       setRsvpContactCategory("adult");
-      setMessage("Presença confirmada. Nos vemos na festa! 🎉");
+      setShowRsvpSuccess(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível confirmar a presença.");
     } finally {
@@ -241,8 +362,93 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
     }
   }
 
+  function openDeclineModal() {
+    setDeclineName(rsvpContact.trim());
+    setDeclineWhatsapp(rsvpWhatsapp.trim());
+    setDeclineDone(false);
+    setDeclineMessage("");
+    setShowDecline(true);
+  }
+
+  async function submitDecline(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (declineBusy || declineName.trim().length < 2) return;
+
+    setDeclineBusy(true);
+    setDeclineMessage("");
+    try {
+      const { data, error } = await supabase.rpc("decline_rsvp_public", {
+        p_invitation_id: invitation.id,
+        p_contact_name: declineName.trim(),
+        p_whatsapp: declineWhatsapp.trim(),
+      });
+      const result = data as { ok?: boolean; error?: string } | null;
+      if (error || !result?.ok) throw new Error(error?.message || result?.error || "Não foi possível enviar sua resposta.");
+      setDeclineDone(true);
+    } catch (error) {
+      setDeclineMessage(error instanceof Error ? error.message : "Não foi possível enviar sua resposta.");
+    } finally {
+      setDeclineBusy(false);
+    }
+  }
+
+  function openPixGift() {
+    setPixGuestName(declineName.trim() || rsvpContact.trim());
+    setPixGuestWhatsapp(declineWhatsapp.trim() || rsvpWhatsapp.trim());
+    setPixError("");
+    setPixData(null);
+    setPixApproved(false);
+    setShowDecline(false);
+    setShowPixGift(true);
+  }
+
+  async function createPixGift(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pixBusy) return;
+
+    setPixBusy(true);
+    setPixError("");
+    try {
+      const response = await fetch("/api/pix-gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invitationId: invitation.id,
+          guestName: pixGuestName.trim(),
+          guestEmail: pixGuestEmail.trim(),
+          guestWhatsapp: pixGuestWhatsapp.trim(),
+          payerCpf: digits(pixCpf),
+          amount: Number(pixAmount),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data?.error || "Não foi possível gerar o PIX.");
+      setPixData(data as PixGiftData);
+      if (data.status === "approved") setPixApproved(true);
+    } catch (error) {
+      setPixError(error instanceof Error ? error.message : "Não foi possível gerar o PIX.");
+    } finally {
+      setPixBusy(false);
+    }
+  }
+
+  async function copyPixCode() {
+    if (!pixData?.qrCode) return;
+    try {
+      await navigator.clipboard.writeText(pixData.qrCode);
+      setPixCopied(true);
+      window.setTimeout(() => setPixCopied(false), 1800);
+    } catch {
+      setPixError("Não foi possível copiar automaticamente. Se preferir, use o QR Code.");
+    }
+  }
+
   const dateText = invitation.event_date
-    ? new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+    ? new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
     : "";
   const visibleGifts = gifts.filter((gift) => !gift.reserved);
 
@@ -283,13 +489,24 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                 {dateText && (
                   <div className="flex items-start gap-3 rounded-2xl bg-[var(--i-soft)]/70 px-4 py-4 text-left">
                     <CalendarDays className="mt-0.5 size-5 shrink-0 text-[var(--i-accent)]" />
-                    <div><p className="text-sm font-bold capitalize">{dateText}</p>{invitation.event_time && <p className="mt-1 text-sm text-[var(--i-muted)]">às {invitation.event_time}</p>}</div>
+                    <div>
+                      <p className="text-sm font-bold capitalize">{dateText}</p>
+                      {invitation.event_time && <p className="mt-1 text-sm text-[var(--i-muted)]">às {invitation.event_time}</p>}
+                    </div>
                   </div>
                 )}
                 {(invitation.location_name || invitation.address) && (
                   <div className="flex items-start gap-3 rounded-2xl bg-[var(--i-soft)]/70 px-4 py-4 text-left">
                     <MapPin className="mt-0.5 size-5 shrink-0 text-[var(--i-accent)]" />
-                    <div><p className="text-sm font-bold">{invitation.location_name || "Local da festa"}</p><p className="mt-1 text-sm leading-5 text-[var(--i-muted)]">{invitation.address}</p>{invitation.maps_url && <a href={invitation.maps_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[var(--i-accent)]">Abrir no mapa <ExternalLink className="size-3.5" /></a>}</div>
+                    <div>
+                      <p className="text-sm font-bold">{invitation.location_name || "Local da festa"}</p>
+                      <p className="mt-1 text-sm leading-5 text-[var(--i-muted)]">{invitation.address}</p>
+                      {invitation.maps_url && (
+                        <a href={invitation.maps_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[var(--i-accent)]">
+                          Abrir no mapa <ExternalLink className="size-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -309,25 +526,12 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Field label="Quem está confirmando?">
-                    <input
-                      value={rsvpContact}
-                      onChange={(event) => setRsvpContact(event.target.value)}
-                      className="h-11 w-full rounded-xl border border-[var(--i-border)] bg-white px-3 outline-none focus:ring-2 focus:ring-[var(--i-soft)]"
-                      required
-                    />
+                    <input value={rsvpContact} onChange={(event) => setRsvpContact(event.target.value)} className="h-11 w-full rounded-xl border border-[var(--i-border)] bg-white px-3 outline-none focus:ring-2 focus:ring-[var(--i-soft)]" required />
                   </Field>
-
                   <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--i-border)] bg-[var(--i-bg)] p-3">
-                    <input
-                      type="checkbox"
-                      checked={includeContactAsAttendee}
-                      onChange={(event) => setIncludeContactAsAttendee(event.target.checked)}
-                      className="mt-0.5 size-4 accent-[var(--i-accent)]"
-                    />
+                    <input type="checkbox" checked={includeContactAsAttendee} onChange={(event) => setIncludeContactAsAttendee(event.target.checked)} className="mt-0.5 size-4 accent-[var(--i-accent)]" />
                     <span>
-                      <span className="block text-sm font-bold">
-                        O responsável também vai à festa
-                      </span>
+                      <span className="block text-sm font-bold">O responsável também vai à festa</span>
                       <span className="mt-0.5 block text-xs leading-5 text-[var(--i-muted)]">
                         {contactAlreadyListed
                           ? "Este nome já está na lista abaixo e não será duplicado."
@@ -340,63 +544,35 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                 </div>
 
                 <Field label="WhatsApp (opcional)">
-                  <input
-                    value={rsvpWhatsapp}
-                    onChange={(event) => setRsvpWhatsapp(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-[var(--i-border)] bg-white px-3 outline-none focus:ring-2 focus:ring-[var(--i-soft)]"
-                  />
+                  <input value={rsvpWhatsapp} onChange={(event) => setRsvpWhatsapp(event.target.value)} className="h-11 w-full rounded-xl border border-[var(--i-border)] bg-white px-3 outline-none focus:ring-2 focus:ring-[var(--i-soft)]" />
                 </Field>
               </div>
 
               <div className="mt-5 rounded-2xl border border-[var(--i-border)] bg-[var(--i-soft)]/45 p-4">
                 <p className="text-sm font-bold">
-                  {includeContactAsAttendee
-                    ? "O responsável será contado automaticamente."
-                    : "O responsável não será contado como convidado."}
+                  {includeContactAsAttendee ? "O responsável será contado automaticamente." : "O responsável não será contado como convidado."}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--i-muted)]">
-                  {includeContactAsAttendee
-                    ? "Adicione abaixo somente as outras pessoas que irão junto."
-                    : "Adicione abaixo todas as pessoas que irão à festa."}
+                  {includeContactAsAttendee ? "Adicione abaixo somente as outras pessoas que irão junto." : "Adicione abaixo todas as pessoas que irão à festa."}
                 </p>
 
                 {includeContactAsAttendee && rsvpContact.trim().length >= 2 && !contactAlreadyListed && (
                   <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5">
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--i-muted)]">
-                        Responsável incluído automaticamente
-                      </p>
+                      <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[var(--i-muted)]">Responsável incluído automaticamente</p>
                       <p className="mt-0.5 text-sm font-bold">{rsvpContact.trim()}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setRsvpContactCategory("adult")}
-                        className={`h-9 rounded-full border px-3 text-xs font-bold ${rsvpContactCategory === "adult" ? "border-[var(--i-accent)] bg-[var(--i-accent)] text-white" : "border-[var(--i-border)] bg-white"}`}
-                      >
-                        Adulto
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRsvpContactCategory("child")}
-                        className={`h-9 rounded-full border px-3 text-xs font-bold ${rsvpContactCategory === "child" ? "border-[var(--i-accent)] bg-[var(--i-accent)] text-white" : "border-[var(--i-border)] bg-white"}`}
-                      >
-                        Criança
-                      </button>
+                      <button type="button" onClick={() => setRsvpContactCategory("adult")} className={`h-9 rounded-full border px-3 text-xs font-bold ${rsvpContactCategory === "adult" ? "border-[var(--i-accent)] bg-[var(--i-accent)] text-white" : "border-[var(--i-border)] bg-white"}`}>Adulto</button>
+                      <button type="button" onClick={() => setRsvpContactCategory("child")} className={`h-9 rounded-full border px-3 text-xs font-bold ${rsvpContactCategory === "child" ? "border-[var(--i-accent)] bg-[var(--i-accent)] text-white" : "border-[var(--i-border)] bg-white"}`}>Criança</button>
                     </div>
                   </div>
                 )}
 
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
-                  <span className="rounded-full bg-white px-3 py-1.5">
-                    {attendeeSummary.total} pessoa(s)
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1.5">
-                    {attendeeSummary.adults} adulto(s)
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1.5">
-                    {attendeeSummary.children} criança(s)
-                  </span>
+                  <span className="rounded-full bg-white px-3 py-1.5">{attendeeSummary.total} pessoa(s)</span>
+                  <span className="rounded-full bg-white px-3 py-1.5">{attendeeSummary.adults} adulto(s)</span>
+                  <span className="rounded-full bg-white px-3 py-1.5">{attendeeSummary.children} criança(s)</span>
                 </div>
               </div>
 
@@ -405,13 +581,7 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                   <div key={index} className="grid gap-2 rounded-2xl bg-[var(--i-bg)] p-3 sm:grid-cols-[1fr_auto_auto]">
                     <input
                       value={attendee.name}
-                      onChange={(event) =>
-                        setAttendees((items) =>
-                          items.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, name: event.target.value } : item,
-                          ),
-                        )
-                      }
+                      onChange={(event) => setAttendees((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))}
                       placeholder={includeContactAsAttendee ? `Outra pessoa ${index + 1}` : `Pessoa ${index + 1}`}
                       className="h-10 rounded-xl border border-[var(--i-border)] bg-white px-3 outline-none"
                     />
@@ -422,36 +592,23 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    attendees.length < maxManualAttendees &&
-                    setAttendees((items) => [...items, { name: "", category: "adult" }])
-                  }
-                  disabled={attendees.length >= maxManualAttendees}
-                  className="h-10 rounded-full border border-[var(--i-border)] bg-white px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  + Adicionar pessoa
-                </button>
-
-                {attendees.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setAttendees((items) => items.slice(0, -1))}
-                    className="h-10 rounded-full px-4 text-sm font-bold text-red-700"
-                  >
-                    Remover última
-                  </button>
-                )}
+                <button type="button" onClick={() => attendees.length < maxManualAttendees && setAttendees((items) => [...items, { name: "", category: "adult" }])} disabled={attendees.length >= maxManualAttendees} className="h-10 rounded-full border border-[var(--i-border)] bg-white px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50">+ Adicionar pessoa</button>
+                {attendees.length > 1 && <button type="button" onClick={() => setAttendees((items) => items.slice(0, -1))} className="h-10 rounded-full px-4 text-sm font-bold text-red-700">Remover última</button>}
               </div>
 
-              <button
-                disabled={rsvpSubmitting}
-                className="mt-5 h-11 rounded-full bg-[var(--i-accent)] px-6 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {rsvpSubmitting ? "Verificando nomes…" : "Confirmar presença"}
-              </button>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                <button disabled={rsvpSubmitting} className="h-11 rounded-full bg-[var(--i-accent)] px-6 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                  {rsvpSubmitting ? "Verificando nomes…" : "Confirmar presença"}
+                </button>
+                <button type="button" onClick={openDeclineModal} className="h-11 rounded-full border border-[var(--i-border)] bg-white px-6 font-bold text-[var(--i-muted)]">
+                  Não poderei comparecer
+                </button>
+              </div>
             </form>
+
+            <div className="mt-4 rounded-2xl border border-[var(--i-border)] bg-[var(--i-panel)] px-5 py-4 text-center text-sm leading-6 text-[var(--i-muted)]">
+              Não poderá ir? Avise o organizador. {pixGiftAvailable && "Se quiser, você também poderá enviar um presente em PIX."}
+            </div>
           </section>
         )}
 
@@ -488,13 +645,111 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
                 ))}
               </div>
             ) : (
-              <div className="mx-auto mt-7 max-w-xl rounded-[1.8rem] border border-[var(--i-border)] bg-[var(--i-panel)] px-6 py-10 text-center"><Gift className="mx-auto size-9 text-[var(--i-accent)]" /><p className="mt-3 font-display text-2xl font-bold">Todos os presentes foram escolhidos</p><p className="mt-2 text-sm text-[var(--i-muted)]">Sua presença continua sendo o presente mais importante.</p></div>
+              <div className="mx-auto mt-7 max-w-xl rounded-[1.8rem] border border-[var(--i-border)] bg-[var(--i-panel)] px-6 py-10 text-center">
+                <Gift className="mx-auto size-9 text-[var(--i-accent)]" />
+                <p className="mt-3 font-display text-2xl font-bold">Todos os presentes foram escolhidos</p>
+                <p className="mt-2 text-sm text-[var(--i-muted)]">Sua presença continua sendo o presente mais importante.</p>
+              </div>
             )}
           </section>
         )}
 
         {message && <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-[var(--i-border)] bg-[var(--i-panel)] px-5 py-4 text-center text-sm font-bold">{message}</div>}
       </section>
+
+      {showRsvpSuccess && (
+        <Modal onClose={() => setShowRsvpSuccess(false)}>
+          <div className="text-center">
+            <span className="mx-auto grid size-14 place-items-center rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 className="size-7" /></span>
+            <h3 className="mt-4 font-display text-3xl font-bold">Presença confirmada!</h3>
+            <p className="mt-2 text-sm leading-6 text-[#806e72]">Sua confirmação foi enviada ao organizador. Esperamos você na comemoração.</p>
+            <div className="mt-6 rounded-2xl bg-[#fff6f1] p-5 text-left">
+              <p className="font-bold text-[#5d313e]">Gostou do CONVNIVER?</p>
+              <p className="mt-1 text-sm leading-6 text-[#76666a]">Crie sua conta gratuitamente agora e deixe tudo pronto para, em breve, criar e gerenciar seus próprios convites.</p>
+              <a href="/entrar?modo=cadastro&origem=confirmacao" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#7d1f37] px-5 font-bold text-white">Criar minha conta</a>
+            </div>
+            <button type="button" onClick={() => setShowRsvpSuccess(false)} className="mt-4 text-sm font-bold text-[#806e72]">Continuar no convite</button>
+          </div>
+        </Modal>
+      )}
+
+      {showDecline && (
+        <Modal onClose={() => setShowDecline(false)}>
+          {!declineDone ? (
+            <form onSubmit={submitDecline}>
+              <h3 className="font-display text-2xl font-bold">Não poderei comparecer</h3>
+              <p className="mt-2 text-sm leading-6 text-[#806e72]">Avise o organizador para que ele possa se planejar.</p>
+              <label className="mt-5 block text-sm font-bold">Seu nome<input value={declineName} onChange={(event) => setDeclineName(event.target.value)} required minLength={2} className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
+              <label className="mt-4 block text-sm font-bold">WhatsApp (opcional)<input value={declineWhatsapp} onChange={(event) => setDeclineWhatsapp(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
+              {declineMessage && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{declineMessage}</p>}
+              <button disabled={declineBusy} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white disabled:opacity-60">{declineBusy && <Loader2 className="size-4 animate-spin" />} Enviar resposta</button>
+            </form>
+          ) : (
+            <div className="text-center">
+              <span className="mx-auto grid size-14 place-items-center rounded-full bg-[#f4e7e0] text-[#7d1f37]"><CheckCircle2 className="size-7" /></span>
+              <h3 className="mt-4 font-display text-2xl font-bold">Resposta enviada</h3>
+              <p className="mt-2 text-sm leading-6 text-[#806e72]">O organizador foi informado de que você não poderá comparecer.</p>
+              {pixGiftAvailable && (
+                <div className="mt-5 rounded-2xl bg-[#fff6f1] p-5">
+                  <CircleDollarSign className="mx-auto size-8 text-[#7d1f37]" />
+                  <p className="mt-3 font-bold">Quer deixar um presente mesmo à distância?</p>
+                  <p className="mt-1 text-sm leading-6 text-[#806e72]">Você pode escolher um valor e pagar por PIX com segurança.</p>
+                  <button type="button" onClick={openPixGift} className="mt-4 h-11 w-full rounded-full bg-[#7d1f37] px-5 font-bold text-white">Enviar presente em PIX</button>
+                </div>
+              )}
+              <button type="button" onClick={() => setShowDecline(false)} className="mt-4 text-sm font-bold text-[#806e72]">Fechar</button>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {showPixGift && (
+        <Modal onClose={() => setShowPixGift(false)} wide>
+          {!pixData ? (
+            <form onSubmit={createPixGift}>
+              <div className="flex items-start gap-3">
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#f4e7e0] text-[#7d1f37]"><CircleDollarSign className="size-5" /></span>
+                <div>
+                  <h3 className="font-display text-2xl font-bold">Presente em PIX</h3>
+                  <p className="mt-1 text-sm leading-6 text-[#806e72]">Escolha um valor. O pagamento será processado pelo Mercado Pago.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-bold sm:col-span-2">Seu nome<input value={pixGuestName} onChange={(event) => setPixGuestName(event.target.value)} required minLength={2} className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
+                <label className="block text-sm font-bold">E-mail<input type="email" value={pixGuestEmail} onChange={(event) => setPixGuestEmail(event.target.value)} required className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
+                <label className="block text-sm font-bold">CPF<input value={pixCpf} onChange={(event) => setPixCpf(formatCpf(event.target.value))} required inputMode="numeric" className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" placeholder="000.000.000-00" /></label>
+                <label className="block text-sm font-bold">WhatsApp (opcional)<input value={pixGuestWhatsapp} onChange={(event) => setPixGuestWhatsapp(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
+                <label className="block text-sm font-bold">Valor do presente<input type="number" min="5" max="10000" step="0.01" value={pixAmount} onChange={(event) => setPixAmount(event.target.value)} required className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
+              </div>
+
+              <p className="mt-4 rounded-xl bg-[#faf6f3] px-4 py-3 text-xs leading-5 text-[#76666a]">O CONVNIVER cobra 5% do valor do presente como taxa da plataforma. As tarifas do Mercado Pago são aplicadas conforme a conta do organizador.</p>
+              {pixError && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{pixError}</p>}
+              <button disabled={pixBusy} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white disabled:opacity-60">{pixBusy && <Loader2 className="size-4 animate-spin" />} Gerar PIX</button>
+            </form>
+          ) : pixApproved ? (
+            <div className="text-center">
+              <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 className="size-8" /></span>
+              <h3 className="mt-4 font-display text-3xl font-bold">Presente recebido!</h3>
+              <p className="mt-2 text-sm leading-6 text-[#806e72]">Pagamento confirmado. O valor será dividido automaticamente entre o organizador e o CONVNIVER pelo Mercado Pago.</p>
+              <button type="button" onClick={() => setShowPixGift(false)} className="mt-5 h-11 rounded-full bg-[#7d1f37] px-6 font-bold text-white">Concluir</button>
+            </div>
+          ) : (
+            <div className="text-center">
+              <h3 className="font-display text-2xl font-bold">Pague o PIX</h3>
+              <p className="mt-2 text-sm leading-6 text-[#806e72]">Presente de <strong>{formatCurrency(pixData.amount)}</strong>. A confirmação será atualizada automaticamente.</p>
+
+              {pixData.qrCodeBase64 && <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="QR Code PIX" className="mx-auto mt-5 size-64 max-w-full rounded-2xl border border-[#eaded7] bg-white p-3" />}
+              {pixData.qrCode && (
+                <button type="button" onClick={() => void copyPixCode()} className="mt-4 inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white"><Clipboard className="size-4" /> {pixCopied ? "Código copiado" : "Copiar PIX copia e cola"}</button>
+              )}
+              {pixData.ticketUrl && <a href={pixData.ticketUrl} target="_blank" rel="noreferrer" className="mx-auto mt-3 block w-fit text-sm font-bold text-[#7d1f37]">Abrir pagamento <ExternalLink className="ml-1 inline size-3.5" /></a>}
+              <div className="mt-5 flex items-center justify-center gap-2 text-sm font-bold text-[#806e72]"><Loader2 className="size-4 animate-spin" /> Aguardando confirmação…</div>
+              {pixError && <p className="mt-3 text-sm text-red-700">{pixError}</p>}
+            </div>
+          )}
+        </Modal>
+      )}
 
       {reservationGift && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/45 p-4">
@@ -511,21 +766,32 @@ export function PublicInvitation({ initialInvitation, initialGifts }: { initialI
   );
 }
 
+function Modal({
+  onClose,
+  children,
+  wide = false,
+}: {
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/50 p-4">
+      <div className={`relative mx-auto mt-10 w-full ${wide ? "max-w-xl" : "max-w-md"} rounded-[1.8rem] bg-white p-6 text-[#351820] shadow-2xl sm:p-7`}>
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 grid size-9 place-items-center rounded-full bg-[#f7efeb] text-[#806e72]" aria-label="Fechar"><X className="size-4" /></button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
   const [failed, setFailed] = useState(false);
-
-  const storedSuggestionImage = isStoredSuggestionImage(gift.suggestion_image_url)
-    ? gift.suggestion_image_url
-    : null;
-  const proxyImage = gift.suggestion_url
-    ? suggestionImageProxyUrl(gift.id, gift.suggestion_url)
-    : null;
+  const storedSuggestionImage = isStoredSuggestionImage(gift.suggestion_image_url) ? gift.suggestion_image_url : null;
+  const proxyImage = gift.suggestion_url ? suggestionImageProxyUrl(gift.id, gift.suggestion_url) : null;
   const src = gift.manual_image_url || storedSuggestionImage || proxyImage;
-  const imageComesFromProxy = !gift.manual_image_url && !storedSuggestionImage && Boolean(proxyImage);
 
-  useEffect(() => {
-    setFailed(false);
-  }, [gift.id, gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url, src]);
+  useEffect(() => { setFailed(false); }, [gift.id, gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url, src]);
 
   if (!src || failed) {
     return <div className="relative grid aspect-[4/3] place-items-center bg-[var(--i-soft)]"><Gift className="size-10 text-[var(--i-accent)]" /><span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)]">{String(index + 1).padStart(2, "0")}</span></div>;
@@ -533,16 +799,7 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden bg-[var(--i-soft)]">
-      <img
-        key={gift.manual_image_url ?? storedSuggestionImage ?? gift.suggestion_url ?? gift.id}
-        src={src}
-        alt={`Imagem sugerida de ${gift.name}`}
-        className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]"
-        onError={() => {
-          if (imageComesFromProxy) setFailed(true);
-          else setFailed(true);
-        }}
-      />
+      <img key={gift.manual_image_url ?? storedSuggestionImage ?? gift.suggestion_url ?? gift.id} src={src} alt={`Imagem sugerida de ${gift.name}`} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]" onError={() => setFailed(true)} />
       <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)] shadow-sm">{String(index + 1).padStart(2, "0")}</span>
     </div>
   );
@@ -555,7 +812,7 @@ function heroImageStyle(invitation: Pick<Invitation, "hero_image_zoom" | "hero_i
   };
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block text-sm font-bold">{label}<div className="mt-2">{children}</div></label>;
 }
 

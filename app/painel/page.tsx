@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarDays, Plus, Settings2 } from "lucide-react";
+import { ArrowUpRight, CalendarDays, CircleDollarSign, Plus, Settings2 } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
 
@@ -21,9 +21,14 @@ export default async function DashboardPage() {
           <h1 className="mt-2 font-display text-4xl font-bold text-[#351820]">Meus convites</h1>
           <p className="mt-2 text-[#78666b]">Crie, personalize, publique e acompanhe seus aniversários.</p>
         </div>
-        <Link href="/painel/novo" className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white">
-          <Plus className="size-4" /> Novo convite
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/painel/pagamentos" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-5 font-bold text-[#684f55]">
+            <CircleDollarSign className="size-4" /> Recebimentos
+          </Link>
+          <Link href="/painel/novo" className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white">
+            <Plus className="size-4" /> Novo convite
+          </Link>
+        </div>
       </div>
 
       {invitations.length === 0 ? (

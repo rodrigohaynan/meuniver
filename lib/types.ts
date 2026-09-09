@@ -24,6 +24,7 @@ export type Invitation = {
   hero_image_y: number;
   gift_enabled: boolean;
   rsvp_enabled: boolean;
+  pix_gift_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -57,4 +58,32 @@ export type GiftReservation = {
   guest_name: string;
   guest_contact: string;
   reserved_at: string;
+};
+
+export type UserProfile = {
+  id: string;
+  full_name: string;
+  sex: "female" | "male" | "other" | "prefer_not_to_say" | "";
+  birth_date: string | null;
+  state: string;
+  city: string;
+  whatsapp: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CashGift = {
+  id: string;
+  invitation_id: string;
+  owner_id: string;
+  guest_name: string;
+  guest_email: string;
+  guest_whatsapp: string;
+  amount: number;
+  platform_fee: number;
+  payment_id: string | null;
+  payment_status: string;
+  created_at: string;
+  updated_at: string;
 };
