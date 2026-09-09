@@ -151,6 +151,13 @@ async function toCompactJpeg(image: SharpPipeline) {
   throw new Error("Não foi possível gerar a imagem social.");
 }
 
+const commonHeaders = {
+  "Content-Type": "image/jpeg",
+  "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+  "Netlify-CDN-Cache-Control": "public, durable, max-age=86400, stale-while-revalidate=604800",
+  "X-Content-Type-Options": "nosniff",
+};
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
@@ -188,11 +195,16 @@ export async function GET(
   return new Response(new Uint8Array(jpeg), {
     status: 200,
     headers: {
-      "Content-Type": "image/jpeg",
+      ...commonHeaders,
       "Content-Length": String(jpeg.length),
-      "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-      "Netlify-CDN-Cache-Control": "public, durable, max-age=3600, stale-while-revalidate=86400",
-      "X-Content-Type-Options": "nosniff",
     },
+  });
+}
+
+
+export async function HEAD() {
+  return new Response(null, {
+    status: 200,
+    headers: commonHeaders,
   });
 }
