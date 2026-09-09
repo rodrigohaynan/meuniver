@@ -29,10 +29,6 @@ const getPublishedInvitation = cache(
 );
 
 async function appBaseUrl() {
-  /*
-   * Para prévias sociais, prefira uma URL pública e estável.
-   * No Netlify, URL normalmente aponta para o site de produção.
-   */
   const candidates = [
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.URL,
@@ -41,7 +37,6 @@ async function appBaseUrl() {
 
   for (const value of candidates) {
     const clean = value?.trim();
-
     if (!clean) continue;
 
     try {
@@ -51,22 +46,16 @@ async function appBaseUrl() {
     }
   }
 
-  /*
-   * Fallback para o host real da requisição.
-   */
   const requestHeaders = await headers();
-
   const host =
     requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim() ||
     requestHeaders.get("host")?.trim();
-
   const forwardedProto =
     requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim();
 
   if (host) {
     const protocol =
-      forwardedProto ||
-      (host.includes("localhost") ? "http" : "https");
+      forwardedProto || (host.includes("localhost") ? "http" : "https");
 
     try {
       return new URL(`${protocol}://${host}`);
@@ -76,6 +65,10 @@ async function appBaseUrl() {
   }
 
   return new URL("http://localhost:3000");
+}
+
+function celebrationName(invitation: Invitation) {
+  return invitation.age_unit === "months" ? "mêsversário" : "aniversário";
 }
 
 function metadataDescription(invitation: Invitation) {
@@ -90,25 +83,28 @@ function metadataDescription(invitation: Invitation) {
   }
 
   const host = (invitation.host_name ?? "").trim();
+  const celebration = celebrationName(invitation);
 
   return host
-    ? `Você está convidado para celebrar o aniversário de ${host}. Confirme sua presença pelo CONVNIVER.`
+    ? `Você está convidado para celebrar o ${celebration} de ${host}. Confirme sua presença pelo CONVNIVER.`
     : "Você está convidado para uma celebração especial. Confirme sua presença pelo CONVNIVER.";
 }
 
 function metadataTitle(invitation: Invitation) {
   const eventTitle = (invitation.event_title ?? "").trim();
   const host = (invitation.host_name ?? "").trim();
+  const label = invitation.age_unit === "months" ? "Mêsversário" : "Aniversário";
 
   if (eventTitle) return eventTitle;
-  if (host) return `Aniversário de ${host}`;
+  if (host) return `${label} de ${host}`;
 
-  return "Convite de aniversário";
+  return invitation.age_unit === "months"
+    ? "Convite de mêsversário"
+    : "Convite de aniversário";
 }
 
 function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
   const clean = value?.trim();
-
   if (!clean) return null;
 
   try {
@@ -125,18 +121,8 @@ function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
 function getShareVersion(
   searchParams: Record<string, string | string[] | undefined>,
 ) {
-  /*
-   * Aceita o parâmetro usado pelo CONVNIVER (?share=...)
-   * e mantém ?v=... por compatibilidade.
-   *
-   * IMPORTANTE:
-   * não muda imagem, título, descrição ou layout.
-   * Apenas faz a URL de compartilhamento realmente variar no og:url,
-   * permitindo quebrar o cache social sem alterar o convite.
-   */
   const raw = searchParams.share ?? searchParams.v;
   const value = Array.isArray(raw) ? raw[0] : raw;
-
   if (!value) return null;
 
   const clean = value
@@ -147,101 +133,93 @@ function getShareVersion(
   return clean || null;
 }
 
+function socialImageVersion(invitation: Invitation, shareVersion: string | null) {
+  if (shareVersion) return shareVersion;
+
+  const updated = (invitation.updated_at ?? "")
+    .replace(/[^0-9]/g, "")
+    .slice(0, 20);
+
+  return updated || invitation.id.slice(0, 12);
+}
+
 export async function generateMetadata({
   params,
   searchParams,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const query = searchParams ? await searchParams : {};
-
   const invitation = await getPublishedInvitation(slug);
 
   if (!invitation) {
     return {
       title: "Convite não encontrado — CONVNIVER",
-      robots: {
-        index: false,
-        follow: false,
-      },
+      robots: { index: false, follow: false },
     };
   }
 
   const title = metadataTitle(invitation);
   const description = metadataDescription(invitation);
   const baseUrl = await appBaseUrl();
-
-  const canonicalUrl = new URL(
-    `/c/${encodeURIComponent(slug)}`,
-    baseUrl,
-  );
-
-  /*
-   * IMPORTANTE:
-   * o parâmetro ?v= passa a fazer parte de og:url.
-   * Assim Instagram/Facebook/WhatsApp recebem uma URL social nova
-   * quando você precisa quebrar o cache da prévia.
-   */
+  const canonicalUrl = new URL(`/c/${encodeURIComponent(slug)}`, baseUrl);
   const socialUrl = new URL(canonicalUrl);
   const shareVersion = getShareVersion(query);
 
   if (shareVersion) {
-    /*
-     * Usa "share" no og:url porque é o mesmo parâmetro
-     * utilizado pelo link que já funciona no Instagram.
-     */
     socialUrl.searchParams.set("share", shareVersion);
   }
 
   /*
-   * V13 — DUAS IMAGENS OPEN GRAPH:
+   * Estratégia social do CONVNIVER:
    *
-   * 1) A imagem ORIGINAL do convite fica em primeiro lugar.
-   *    Foi essa que funcionou no Instagram.
+   * 1) imagem original em primeiro lugar: mantém o comportamento que funciona
+   *    no Instagram;
+   * 2) JPG social 1200x630 em segundo lugar: versão leve e compatível com
+   *    WhatsApp.
    *
-   * 2) O JPG leve em /public/social fica em segundo lugar.
-   *    Foi esse que funcionou no WhatsApp.
-   *
-   * A ideia é preservar o comportamento do Instagram e oferecer ao WhatsApp
-   * uma segunda alternativa compatível caso ele descarte a imagem original.
+   * O convite do Théo mantém o JPG estático já validado. Todos os demais
+   * convites, inclusive os novos, recebem automaticamente uma versão JPG pela
+   * rota /social-preview/[slug].jpg.
    */
-  const originalPreviewImage = absoluteUrl(
-    invitation.hero_image_url,
-    baseUrl,
-  );
+  const originalPreviewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
 
-  const whatsappPreviewImage =
-    slug === "theo-rhaian"
-      ? new URL("/social/theo-rhaian-whatsapp.jpg", baseUrl).toString()
-      : null;
+  let whatsappPreviewImage: string | null = null;
+
+  if (slug === "theo-rhaian") {
+    whatsappPreviewImage = new URL(
+      "/social/theo-rhaian-whatsapp.jpg",
+      baseUrl,
+    ).toString();
+  } else if (originalPreviewImage) {
+    const generatedPreview = new URL(
+      `/social-preview/${encodeURIComponent(slug)}.jpg`,
+      baseUrl,
+    );
+    generatedPreview.searchParams.set(
+      "v",
+      socialImageVersion(invitation, shareVersion),
+    );
+    whatsappPreviewImage = generatedPreview.toString();
+  }
 
   const host = (invitation.host_name ?? "").trim();
-  const imageAlt = host
-    ? `Convite de aniversário de ${host}`
-    : title;
+  const celebration = celebrationName(invitation);
+  const imageAlt = host ? `Convite de ${celebration} de ${host}` : title;
 
   return {
     metadataBase: baseUrl,
-
     title: `${title} — CONVNIVER`,
     description,
-
     alternates: {
       canonical: canonicalUrl.toString(),
     },
-
     openGraph: {
       type: "website",
       locale: "pt_BR",
       siteName: "CONVNIVER",
       title,
       description,
-
-      /*
-       * Não remover o ?v= daqui.
-       * Ele é usado justamente para quebrar cache social.
-       */
       url: socialUrl.toString(),
-
       images: [
         ...(originalPreviewImage
           ? [
@@ -251,7 +229,6 @@ export async function generateMetadata({
               },
             ]
           : []),
-
         ...(whatsappPreviewImage
           ? [
               {
@@ -265,7 +242,6 @@ export async function generateMetadata({
           : []),
       ],
     },
-
     twitter: {
       card: "summary_large_image",
       title,
@@ -279,11 +255,8 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicInvitationPage({
-  params,
-}: PageProps) {
+export default async function PublicInvitationPage({ params }: PageProps) {
   const { slug } = await params;
-
   const invitation = await getPublishedInvitation(slug);
 
   if (!invitation) {
@@ -291,7 +264,6 @@ export default async function PublicInvitationPage({
   }
 
   const supabase = await createServerSupabaseClient();
-
   const { data: giftsData } = await supabase
     .from("gifts")
     .select("*")
