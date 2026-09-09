@@ -193,22 +193,26 @@ export async function generateMetadata({
   }
 
   /*
-   * TESTE JPG PARA WHATSAPP:
-   * Para o convite do Théo usamos uma imagem JPG estática, leve e pública,
-   * hospedada corretamente em /public/social.
+   * V13 — DUAS IMAGENS OPEN GRAPH:
    *
-   * Arquivo físico:
-   * public/social/theo-rhaian-whatsapp.jpg
+   * 1) A imagem ORIGINAL do convite fica em primeiro lugar.
+   *    Foi essa que funcionou no Instagram.
    *
-   * URL pública:
-   * /social/theo-rhaian-whatsapp.jpg
+   * 2) O JPG leve em /public/social fica em segundo lugar.
+   *    Foi esse que funcionou no WhatsApp.
    *
-   * Para todos os outros convites, mantém a imagem original cadastrada.
+   * A ideia é preservar o comportamento do Instagram e oferecer ao WhatsApp
+   * uma segunda alternativa compatível caso ele descarte a imagem original.
    */
-  const previewImage =
+  const originalPreviewImage = absoluteUrl(
+    invitation.hero_image_url,
+    baseUrl,
+  );
+
+  const whatsappPreviewImage =
     slug === "theo-rhaian"
       ? new URL("/social/theo-rhaian-whatsapp.jpg", baseUrl).toString()
-      : absoluteUrl(invitation.hero_image_url, baseUrl);
+      : null;
 
   const host = (invitation.host_name ?? "").trim();
   const imageAlt = host
@@ -238,24 +242,39 @@ export async function generateMetadata({
        */
       url: socialUrl.toString(),
 
-      images: previewImage
-        ? [
-            {
-              url: previewImage,
-              width: 1200,
-              height: 630,
-              type: "image/jpeg",
-              alt: imageAlt,
-            },
-          ]
-        : undefined,
+      images: [
+        ...(originalPreviewImage
+          ? [
+              {
+                url: originalPreviewImage,
+                alt: imageAlt,
+              },
+            ]
+          : []),
+
+        ...(whatsappPreviewImage
+          ? [
+              {
+                url: whatsappPreviewImage,
+                width: 1200,
+                height: 630,
+                type: "image/jpeg",
+                alt: imageAlt,
+              },
+            ]
+          : []),
+      ],
     },
 
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: previewImage ? [previewImage] : undefined,
+      images: originalPreviewImage
+        ? [originalPreviewImage]
+        : whatsappPreviewImage
+          ? [whatsappPreviewImage]
+          : undefined,
     },
   };
 }
