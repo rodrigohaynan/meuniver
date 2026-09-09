@@ -1,0 +1,223 @@
+name: Aplicar suporte a mesversarios
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-monthiversary.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Aplicar alteracoes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Trecho nao encontrado em {path}: {old[:120]!r}')
+              text = text.replace(old, new, count)
+              p.write_text(text, encoding='utf-8')
+
+          # 1) Tipos
+          replace(
+              'lib/types.ts',
+              'export type InvitationStatus = "draft" | "published";\nexport type LayoutKey = "elegant" | "modern" | "kids";',
+              'export type InvitationStatus = "draft" | "published";\nexport type AgeUnit = "years" | "months";\nexport type LayoutKey = "elegant" | "modern" | "kids";'
+          )
+          replace(
+              'lib/types.ts',
+              '  age: number;\n  event_date: string | null;',
+              '  age: number;\n  age_unit: AgeUnit;\n  event_date: string | null;'
+          )
+
+          # 2) Novo convite: aniversario ou mesversario
+          replace(
+              'components/new-invitation-form.tsx',
+              '  const [hostName, setHostName] = useState("");\n  const [age, setAge] = useState(30);',
+              '  const [hostName, setHostName] = useState("");\n  const [ageUnit, setAgeUnit] = useState<"years" | "months">("years");\n  const [age, setAge] = useState(30);'
+          )
+          replace(
+              'components/new-invitation-form.tsx',
+              '      const suffix = Math.random().toString(36).slice(2, 6);\n      const slug = `${slugify(hostName) || "aniversario"}-${suffix}`;',
+              '      const suffix = Math.random().toString(36).slice(2, 6);\n      const prefix = ageUnit === "months" ? "mesversario" : "aniversario";\n      const slug = `${prefix}-${slugify(hostName) || "convite"}-${suffix}`;'
+          )
+          replace(
+              'components/new-invitation-form.tsx',
+              '          event_title: `Aniversário de ${hostName.trim()}`,\n          host_name: hostName.trim(),\n          age: Math.max(1, Math.min(120, Math.round(age || 1))),',
+              '          event_title: `${ageUnit === "months" ? "Mêsversário" : "Aniversário"} de ${hostName.trim()}`,\n          host_name: hostName.trim(),\n          age: Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Math.round(age || 1))),\n          age_unit: ageUnit,'
+          )
+          replace(
+              'components/new-invitation-form.tsx',
+              '          invitation_text: "Vamos celebrar juntos! Sua presença vai deixar esse dia ainda mais especial.",',
+              '          invitation_text: ageUnit === "months"\n            ? "Vamos celebrar mais um mês de vida! Sua presença vai deixar esse momento ainda mais especial."\n            : "Vamos celebrar juntos! Sua presença vai deixar esse dia ainda mais especial.",'
+          )
+          replace(
+              'components/new-invitation-form.tsx',
+              '      <div className="mt-6 grid gap-4 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:grid-cols-[1fr_160px] sm:p-6">',
+              '''      <div className="mt-6 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
+        <p className="text-sm font-bold text-[#594147]">Tipo de comemoração</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => { setAgeUnit("years"); setAge((value) => Math.max(1, value)); }}
+            className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "years" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}
+          >
+            <strong className="block text-[#3c2028]">Aniversário</strong>
+            <span className="mt-1 block text-xs text-[#806e72]">Idade em anos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAgeUnit("months"); setAge((value) => Math.max(1, Math.min(12, value > 12 ? 1 : value))); }}
+            className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "months" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}
+          >
+            <strong className="block text-[#3c2028]">Mêsversário</strong>
+            <span className="mt-1 block text-xs text-[#806e72]">De 1 a 12 meses, ideal para o primeiro ano</span>
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_160px]">'''
+          )
+          replace(
+              'components/new-invitation-form.tsx',
+              '          <span className="text-sm font-bold text-[#594147]">Idade</span>\n          <input type="number" min={1} max={120} value={age} onChange={(event) => setAge(Number(event.target.value))}',
+              '          <span className="text-sm font-bold text-[#594147]">{ageUnit === "months" ? "Meses" : "Idade"}</span>\n          <input type="number" min={1} max={ageUnit === "months" ? 12 : 120} value={age} onChange={(event) => setAge(Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Number(event.target.value) || 1)))}'
+          )
+          replace(
+              'components/new-invitation-form.tsx',
+              '        </label>\n      </div>\n\n      {error &&',
+              '        </label>\n        </div>\n      </div>\n\n      {error &&'
+          )
+
+          # 3) Painel principal
+          replace(
+              'app/painel/page.tsx',
+              'function formatAge(age: number) {\n  const value = Math.max(1, Math.round(Number(age) || 1));\n  return `${value} ${value === 1 ? "ano" : "anos"}`;\n}',
+              'function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {\n  const value = Math.max(1, Math.round(Number(age) || 1));\n  if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;\n  return `${value} ${value === 1 ? "ano" : "anos"}`;\n}'
+          )
+          replace(
+              'app/painel/page.tsx',
+              'Crie, personalize, publique e acompanhe seus aniversários.',
+              'Crie, personalize, publique e acompanhe aniversários e mêsversários.'
+          )
+          replace(
+              'app/painel/page.tsx',
+              '{!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">🎂</div>}',
+              '{!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">{invitation.age_unit === "months" ? "🍼" : "🎂"}</div>}'
+          )
+          replace(
+              'app/painel/page.tsx',
+              '{invitation.host_name} • {formatAge(invitation.age)}',
+              '{invitation.host_name} • {formatAge(invitation.age, invitation.age_unit ?? "years")}'
+          )
+
+          # 4) Editor
+          replace(
+              'components/invitation-editor.tsx',
+              'function formatAge(age: number) {\n  const value = Math.max(1, Math.round(Number(age) || 1));\n  return `${value} ${value === 1 ? "ano" : "anos"}`;\n}',
+              'function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {\n  const value = Math.max(1, Math.round(Number(age) || 1));\n  if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;\n  return `${value} ${value === 1 ? "ano" : "anos"}`;\n}'
+          )
+          replace(
+              'components/invitation-editor.tsx',
+              '    hero_image_y: initialInvitation.hero_image_y ?? 50,\n  });',
+              '    hero_image_y: initialInvitation.hero_image_y ?? 50,\n    age_unit: initialInvitation.age_unit ?? "years",\n  });'
+          )
+          replace(
+              'components/invitation-editor.tsx',
+              '        age: Math.max(1, Math.min(120, Math.round(invitation.age || 1))),\n        event_date:',
+              '        age: Math.max(1, Math.min(invitation.age_unit === "months" ? 12 : 120, Math.round(invitation.age || 1))),\n        age_unit: invitation.age_unit,\n        event_date:'
+          )
+          replace(
+              'components/invitation-editor.tsx',
+              '<Field label="Idade"><Input type="number" value={String(invitation.age)} onChange={(value) => setInvitation({ ...invitation, age: Number(value) })} /></Field>',
+              '''<Field label="Tipo de comemoração">
+                  <select
+                    value={invitation.age_unit}
+                    onChange={(event) => {
+                      const nextUnit = event.target.value as Invitation["age_unit"];
+                      const genericTitle = /^(Aniversário|Mêsversário) de /i.test(invitation.event_title);
+                      setInvitation({
+                        ...invitation,
+                        age_unit: nextUnit,
+                        age: Math.max(1, Math.min(nextUnit === "months" ? 12 : 120, invitation.age)),
+                        event_title: genericTitle
+                          ? `${nextUnit === "months" ? "Mêsversário" : "Aniversário"} de ${invitation.host_name}`
+                          : invitation.event_title,
+                      });
+                    }}
+                    className="h-11 w-full rounded-xl border border-[#d8c7bd] bg-white px-3 text-sm outline-none focus:border-[#9e6172]"
+                  >
+                    <option value="years">Aniversário</option>
+                    <option value="months">Mêsversário</option>
+                  </select>
+                </Field>
+                <Field label={invitation.age_unit === "months" ? "Meses" : "Idade"}>
+                  <Input
+                    type="number"
+                    value={String(invitation.age)}
+                    onChange={(value) => setInvitation({
+                      ...invitation,
+                      age: Math.max(1, Math.min(invitation.age_unit === "months" ? 12 : 120, Number(value) || 1)),
+                    })}
+                  />
+                </Field>'''
+          )
+          replace(
+              'components/invitation-editor.tsx',
+              '{formatAge(invitation.age)} {invitation.event_date ?',
+              '{formatAge(invitation.age, invitation.age_unit ?? "years")} {invitation.event_date ?'
+          )
+
+          # 5) Convite publico
+          replace(
+              'components/public-invitation.tsx',
+              'function formatAge(age: number) {\n  const value = Math.max(1, Math.round(Number(age) || 1));\n  return `${value} ${value === 1 ? "ano" : "anos"}`;\n}',
+              'function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {\n  const value = Math.max(1, Math.round(Number(age) || 1));\n  if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;\n  return `${value} ${value === 1 ? "ano" : "anos"}`;\n}'
+          )
+          replace(
+              'components/public-invitation.tsx',
+              '    pix_gift_enabled: initialInvitation.pix_gift_enabled ?? true,\n  };',
+              '    pix_gift_enabled: initialInvitation.pix_gift_enabled ?? true,\n    age_unit: initialInvitation.age_unit ?? "years",\n  };'
+          )
+          replace(
+              'components/public-invitation.tsx',
+              '{formatAge(invitation.age)}</span>',
+              '{formatAge(invitation.age, invitation.age_unit)}</span>'
+          )
+
+          # 6) Schema para novas instalacoes
+          replace(
+              'supabase/schema.sql',
+              "  age integer not null default 1 check (age between 1 and 120),\n  event_date date,",
+              "  age integer not null default 1 check (age between 1 and 120),\n  age_unit text not null default 'years' check (age_unit in ('years','months')),\n  event_date date,"
+          )
+
+          # 7) Migracao da base atual
+          migration = Path('supabase/MIGRACAO_004_MESVERSARIOS.sql')
+          migration.write_text('''-- CONVNIVER — Migração 004\n-- Suporte a aniversários em anos e mêsversários de 1 a 12 meses.\n\nalter table public.invitations\nadd column if not exists age_unit text not null default 'years';\n\nalter table public.invitations\ndrop constraint if exists invitations_age_unit_check;\n\nalter table public.invitations\nadd constraint invitations_age_unit_check\ncheck (age_unit in ('years', 'months'));\n\nalter table public.invitations\ndrop constraint if exists invitations_month_age_check;\n\nalter table public.invitations\nadd constraint invitations_month_age_check\ncheck (age_unit = 'years' or age between 1 and 12);\n\ncomment on column public.invitations.age_unit is\n'Unidade da idade da comemoração: years para aniversário e months para mêsversário.';\n''', encoding='utf-8')
+          PY
+
+      - name: Validar build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commitar alteracoes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/types.ts components/new-invitation-form.tsx app/painel/page.tsx components/invitation-editor.tsx components/public-invitation.tsx supabase/schema.sql supabase/MIGRACAO_004_MESVERSARIOS.sql
+          git commit -m "Adiciona suporte a convites de mêsversário"
+          git push origin HEAD:main
