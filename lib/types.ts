@@ -2,6 +2,11 @@ export type InvitationStatus = "draft" | "published";
 export type AgeUnit = "years" | "months";
 export type LayoutKey = "elegant" | "modern" | "kids";
 
+export type GiftProfileItem = {
+  label: string;
+  value: string;
+};
+
 export type Invitation = {
   id: string;
   owner_id: string;
@@ -26,6 +31,7 @@ export type Invitation = {
   hero_image_x: number;
   hero_image_y: number;
   gift_enabled: boolean;
+  gift_profile: GiftProfileItem[];
   rsvp_enabled: boolean;
   pix_gift_enabled: boolean;
   created_at: string;
