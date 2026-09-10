@@ -1,6 +1,7 @@
 export type InvitationStatus = "draft" | "published";
 export type AgeUnit = "years" | "months";
 export type LayoutKey = "elegant" | "modern" | "kids";
+export type GiftReservationMode = "single" | "multiple";
 
 export type GiftProfileItem = {
   label: string;
@@ -49,6 +50,7 @@ export type GiftItem = {
   suggestion_image_url: string | null;
   sort_order: number;
   reserved: boolean;
+  reservation_mode: GiftReservationMode;
   created_at: string;
 };
 
