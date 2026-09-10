@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { GiftProfileEditor } from "@/components/gift-profile-editor";
 import { InvitationEditor } from "@/components/invitation-editor";
 import { RsvpDeclinesPanel, type RsvpDecline } from "@/components/rsvp-declines-panel";
 import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
@@ -44,6 +45,12 @@ export default async function InvitationEditorPage({ params }: { params: Promise
         </div>
         <span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#806e72] shadow-sm">/c/{invitation.slug}</span>
       </div>
+
+      <GiftProfileEditor
+        invitationId={invitation.id}
+        hostName={invitation.host_name}
+        initialProfile={invitation.gift_profile ?? []}
+      />
 
       <RsvpDeclinesPanel invitationId={invitation.id} initialDeclines={declines} />
 
