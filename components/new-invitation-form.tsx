@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TEMPLATES } from "@/lib/themes";
+import type { GiftProfileItem } from "@/lib/types";
 
 function slugify(value: string) {
   return value
@@ -16,14 +17,58 @@ function slugify(value: string) {
     .slice(0, 45);
 }
 
+const GIFT_FIELDS = [
+  { key: "shoe", label: "Calçado", placeholder: "Ex.: 20/21, 37..." },
+  { key: "shirt", label: "Camiseta / blusa", placeholder: "Ex.: 2 anos, M..." },
+  { key: "pants", label: "Calça / short", placeholder: "Ex.: 2 anos, 40..." },
+  { key: "dress", label: "Vestido", placeholder: "Ex.: 2 anos, M..." },
+  { key: "diaper", label: "Fralda", placeholder: "Ex.: M, G, XG..." },
+  { key: "ring", label: "Anel / diâmetro do dedo", placeholder: "Ex.: aro 18 ou 17,5 mm" },
+] as const;
+
+type GiftFieldKey = (typeof GIFT_FIELDS)[number]["key"];
+type GiftForm = Record<GiftFieldKey, string> & {
+  colors: string;
+  interests: string;
+  notes: string;
+};
+
+const EMPTY_GIFT_FORM: GiftForm = {
+  shoe: "",
+  shirt: "",
+  pants: "",
+  dress: "",
+  diaper: "",
+  ring: "",
+  colors: "",
+  interests: "",
+  notes: "",
+};
+
+function buildGiftProfile(form: GiftForm): GiftProfileItem[] {
+  const rows: GiftProfileItem[] = GIFT_FIELDS
+    .map((field) => ({ label: field.label, value: form[field.key].trim() }))
+    .filter((item) => item.value);
+
+  if (form.colors.trim()) rows.push({ label: "Cores preferidas", value: form.colors.trim() });
+  if (form.interests.trim()) rows.push({ label: "Temas / hobbies / interesses", value: form.interests.trim() });
+  if (form.notes.trim()) rows.push({ label: "Outras observações", value: form.notes.trim() });
+  return rows;
+}
+
 export function NewInvitationForm() {
   const router = useRouter();
   const [templateKey, setTemplateKey] = useState(TEMPLATES[0].key);
   const [hostName, setHostName] = useState("");
   const [ageUnit, setAgeUnit] = useState<"years" | "months">("years");
   const [age, setAge] = useState(30);
+  const [giftForm, setGiftForm] = useState<GiftForm>(EMPTY_GIFT_FORM);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  function updateGiftField(key: keyof GiftForm, value: string) {
+    setGiftForm((current) => ({ ...current, [key]: value }));
+  }
 
   async function createInvitation() {
     if (hostName.trim().length < 2 || busy) return;
@@ -62,6 +107,7 @@ export function NewInvitationForm() {
           theme_key: template.theme,
           layout_key: template.layout,
           gift_enabled: true,
+          gift_profile: buildGiftProfile(giftForm),
           rsvp_enabled: true,
         })
         .select("id")
@@ -110,16 +156,46 @@ export function NewInvitationForm() {
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_160px]">
-        <label>
-          <span className="text-sm font-bold text-[#594147]">Nome do aniversariante</span>
-          <input value={hostName} onChange={(event) => setHostName(event.target.value)} maxLength={80} placeholder="Ex.: Liene, Sofia, Miguel..." className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172] focus:ring-2 focus:ring-[#9e6172]/10" />
-        </label>
-        <label>
-          <span className="text-sm font-bold text-[#594147]">{ageUnit === "months" ? "Meses" : "Idade"}</span>
-          <input type="number" min={1} max={ageUnit === "months" ? 12 : 120} value={age} onChange={(event) => setAge(Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Number(event.target.value) || 1)))} className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
-        </label>
+          <label>
+            <span className="text-sm font-bold text-[#594147]">Nome do aniversariante</span>
+            <input value={hostName} onChange={(event) => setHostName(event.target.value)} maxLength={80} placeholder="Ex.: Liene, Sofia, Miguel..." className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172] focus:ring-2 focus:ring-[#9e6172]/10" />
+          </label>
+          <label>
+            <span className="text-sm font-bold text-[#594147]">{ageUnit === "months" ? "Meses" : "Idade"}</span>
+            <input type="number" min={1} max={ageUnit === "months" ? 12 : 120} value={age} onChange={(event) => setAge(Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Number(event.target.value) || 1)))} className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
+          </label>
         </div>
       </div>
+
+      <details className="mt-5 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
+        <summary className="cursor-pointer font-display text-xl font-bold text-[#3c2028]">Tamanhos e preferências para presentes <span className="font-sans text-sm font-normal text-[#806e72]">(opcional)</span></summary>
+        <p className="mt-2 text-sm leading-6 text-[#806e72]">Preencha somente o que fizer sentido. Essas informações ajudam os convidados a escolher roupas, calçados e outros presentes no tamanho certo.</p>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {GIFT_FIELDS.map((field) => (
+            <label key={field.key}>
+              <span className="text-sm font-bold text-[#594147]">{field.label}</span>
+              <input value={giftForm[field.key]} onChange={(event) => updateGiftField(field.key, event.target.value)} maxLength={120} placeholder={field.placeholder} className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" />
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label>
+            <span className="text-sm font-bold text-[#594147]">Cores preferidas</span>
+            <input value={giftForm.colors} onChange={(event) => updateGiftField("colors", event.target.value)} maxLength={160} placeholder="Ex.: azul, verde, tons neutros" className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" />
+          </label>
+          <label>
+            <span className="text-sm font-bold text-[#594147]">Temas, personagens, hobbies ou interesses</span>
+            <input value={giftForm.interests} onChange={(event) => updateGiftField("interests", event.target.value)} maxLength={200} placeholder="Ex.: dinossauros, futebol, desenho..." className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" />
+          </label>
+        </div>
+
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-[#594147]">Outras observações úteis</span>
+          <textarea value={giftForm.notes} onChange={(event) => updateGiftField("notes", event.target.value)} maxLength={400} rows={3} placeholder="Ex.: prefere roupas sem gola, já tem muitos brinquedos de determinado tipo..." className="mt-2 w-full rounded-xl border border-[#d8c7bd] px-3 py-3 outline-none focus:border-[#9e6172]" />
+        </label>
+      </details>
 
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
