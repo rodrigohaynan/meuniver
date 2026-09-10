@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PublicInvitation } from "@/components/public-invitation";
+import { PublicGiftExtras } from "@/components/public-gift-extras";
 import type { GiftItem, Invitation } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -244,10 +245,21 @@ export default async function PublicInvitationPage({ params }: PageProps) {
     .eq("invitation_id", invitation.id)
     .order("sort_order");
 
+  const gifts = (giftsData ?? []) as GiftItem[];
+
   return (
-    <PublicInvitation
-      initialInvitation={invitation}
-      initialGifts={(giftsData ?? []) as GiftItem[]}
-    />
+    <>
+      <PublicInvitation
+        initialInvitation={invitation}
+        initialGifts={gifts}
+      />
+      <PublicGiftExtras
+        hostName={invitation.host_name}
+        themeKey={invitation.theme_key}
+        giftEnabled={invitation.gift_enabled}
+        giftProfile={invitation.gift_profile ?? []}
+        gifts={gifts}
+      />
+    </>
   );
 }
