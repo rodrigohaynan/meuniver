@@ -250,8 +250,8 @@ export default async function PublicInvitationPage({ params }: PageProps) {
   return (
     <>
       <PublicInvitation
-        initialInvitation={invitation}
-        initialGifts={gifts}
+        initialInvitation={{ ...invitation, gift_enabled: false }}
+        initialGifts={[]}
       />
       <PublicGiftExtras
         hostName={invitation.host_name}
