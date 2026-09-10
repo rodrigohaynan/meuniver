@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GiftProfileEditor } from "@/components/gift-profile-editor";
+import { GiftReservationModeEditor } from "@/components/gift-reservation-mode-editor";
 import { InvitationEditor } from "@/components/invitation-editor";
 import { RsvpDeclinesPanel, type RsvpDecline } from "@/components/rsvp-declines-panel";
 import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
@@ -50,6 +51,11 @@ export default async function InvitationEditorPage({ params }: { params: Promise
         invitationId={invitation.id}
         hostName={invitation.host_name}
         initialProfile={invitation.gift_profile ?? []}
+      />
+
+      <GiftReservationModeEditor
+        initialGifts={gifts}
+        reservations={reservations}
       />
 
       <RsvpDeclinesPanel invitationId={invitation.id} initialDeclines={declines} />
