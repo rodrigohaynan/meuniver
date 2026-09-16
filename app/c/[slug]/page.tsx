@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PublicInvitation } from "@/components/public-invitation";
+import { PublicRsvpForm } from "@/components/public-rsvp-form";
 import { PublicGiftExtras } from "@/components/public-gift-extras";
 import type { GiftItem, Invitation } from "@/lib/types";
 
@@ -250,9 +251,14 @@ export default async function PublicInvitationPage({ params }: PageProps) {
   return (
     <>
       <PublicInvitation
-        initialInvitation={{ ...invitation, gift_enabled: false }}
+        initialInvitation={{
+          ...invitation,
+          gift_enabled: false,
+          rsvp_enabled: false,
+        }}
         initialGifts={[]}
       />
+      {invitation.rsvp_enabled && <PublicRsvpForm invitation={invitation} />}
       <PublicGiftExtras
         hostName={invitation.host_name}
         themeKey={invitation.theme_key}
