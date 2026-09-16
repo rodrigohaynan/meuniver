@@ -7,6 +7,7 @@ export type AttendanceExportGroup = {
   attendees: Array<{
     name: string;
     category: AttendanceCategory;
+    age?: number | null;
   }>;
 };
 
@@ -19,31 +20,92 @@ type AttendanceRow = {
   number: number;
   name: string;
   category: AttendanceCategory;
+  age: number | null;
+  ageGroup: string;
   contactName: string;
   whatsapp: string;
   createdAt: string;
 };
 
+type AgeGroupKey = "0-3" | "3-6" | "6-12" | "12-17" | "unknown";
+
+type AgeGroupDefinition = {
+  key: AgeGroupKey;
+  label: string;
+};
+
+const AGE_GROUPS: AgeGroupDefinition[] = [
+  { key: "0-3", label: "0 a 3 anos" },
+  { key: "3-6", label: "3 a 6 anos" },
+  { key: "6-12", label: "6 a 12 anos" },
+  { key: "12-17", label: "12 a 17 anos" },
+  { key: "unknown", label: "Idade não informada" },
+];
+
+function normalizeAge(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const age = Number(value);
+  if (!Number.isInteger(age) || age < 0 || age > 17) return null;
+  return age;
+}
+
+function ageGroupKey(age: number | null): AgeGroupKey {
+  if (age === null) return "unknown";
+  // Para evitar dupla contagem nos limites solicitados:
+  // 3 fica em 0–3; 6 em 3–6; 12 em 6–12.
+  if (age <= 3) return "0-3";
+  if (age <= 6) return "3-6";
+  if (age <= 12) return "6-12";
+  return "12-17";
+}
+
+function ageGroupLabel(age: number | null) {
+  const key = ageGroupKey(age);
+  return AGE_GROUPS.find((group) => group.key === key)?.label ?? "Idade não informada";
+}
+
 function attendanceRows(payload: AttendanceExportPayload) {
   let number = 0;
   return payload.groups.flatMap((group) =>
-    group.attendees.map((attendee) => ({
-      number: ++number,
-      name: attendee.name.trim(),
-      category: attendee.category,
-      contactName: group.contactName.trim(),
-      whatsapp: group.whatsapp?.trim() ?? "",
-      createdAt: formatDateTime(group.createdAt),
-    })),
+    group.attendees.map((attendee) => {
+      const age = attendee.category === "child" ? normalizeAge(attendee.age) : null;
+      return {
+        number: ++number,
+        name: attendee.name.trim(),
+        category: attendee.category,
+        age,
+        ageGroup: attendee.category === "child" ? ageGroupLabel(age) : "—",
+        contactName: group.contactName.trim(),
+        whatsapp: group.whatsapp?.trim() ?? "",
+        createdAt: formatDateTime(group.createdAt),
+      } satisfies AttendanceRow;
+    }),
   );
 }
 
 function summary(rows: AttendanceRow[]) {
+  const children = rows.filter((row) => row.category === "child");
+  const ageGroups = Object.fromEntries(
+    AGE_GROUPS.map((group) => [
+      group.key,
+      children.filter((row) => ageGroupKey(row.age) === group.key).length,
+    ]),
+  ) as Record<AgeGroupKey, number>;
+
   return {
     total: rows.length,
     adults: rows.filter((row) => row.category === "adult").length,
-    children: rows.filter((row) => row.category === "child").length,
+    children: children.length,
+    ageGroups,
   };
+}
+
+function groupedChildren(rows: AttendanceRow[]) {
+  const children = rows.filter((row) => row.category === "child");
+  return AGE_GROUPS.map((group) => ({
+    ...group,
+    rows: children.filter((row) => ageGroupKey(row.age) === group.key),
+  }));
 }
 
 function formatDateTime(value?: string | null) {
@@ -61,6 +123,12 @@ function formatDateTime(value?: string | null) {
 
 function categoryLabel(category: AttendanceCategory) {
   return category === "child" ? "Criança" : "Adulto";
+}
+
+function ageLabel(row: AttendanceRow) {
+  if (row.category !== "child") return "—";
+  if (row.age === null) return "Não informada";
+  return `${row.age} ${row.age === 1 ? "ano" : "anos"}`;
 }
 
 function safeFilename(value: string) {
@@ -117,27 +185,63 @@ function xlsxCell(value: string | number, row: number, column: number, style = 0
 function makeSheetXml(payload: AttendanceExportPayload) {
   const rows = attendanceRows(payload);
   const counts = summary(rows);
+  const grouped = groupedChildren(rows);
   const data: Array<Array<string | number>> = [
     [`Lista de presença - ${payload.eventTitle}`],
     ["Total de convidados", counts.total],
     ["Adultos", counts.adults],
     ["Crianças", counts.children],
+    ["Crianças de 0 a 3 anos", counts.ageGroups["0-3"]],
+    ["Crianças de 3 a 6 anos", counts.ageGroups["3-6"]],
+    ["Crianças de 6 a 12 anos", counts.ageGroups["6-12"]],
+    ["Crianças de 12 a 17 anos", counts.ageGroups["12-17"]],
+    ["Crianças sem idade informada", counts.ageGroups.unknown],
     [],
-    ["Nº", "Convidado", "Categoria", "Responsável", "WhatsApp", "Confirmado em"],
+    ["Nº", "Convidado", "Categoria", "Idade", "Faixa etária", "Responsável", "WhatsApp", "Confirmado em"],
     ...rows.map((row) => [
       row.number,
       row.name,
       categoryLabel(row.category),
+      row.category === "child" && row.age !== null ? row.age : "",
+      row.ageGroup,
       row.contactName,
       row.whatsapp,
       row.createdAt,
     ]),
+    [],
+    ["Crianças separadas por faixa etária"],
   ];
 
+  for (const group of grouped) {
+    data.push([]);
+    data.push([`${group.label} (${group.rows.length})`]);
+    data.push(["Nº", "Convidado", "Idade", "Responsável", "WhatsApp"]);
+    if (group.rows.length === 0) {
+      data.push(["", "Nenhuma criança nesta faixa"]);
+    } else {
+      for (const row of group.rows) {
+        data.push([
+          row.number,
+          row.name,
+          row.age === null ? "Não informada" : row.age,
+          row.contactName,
+          row.whatsapp,
+        ]);
+      }
+    }
+  }
+
+  const mainHeaderRow = 11;
   const sheetRows = data
     .map((values, rowIndex) => {
       const rowNumber = rowIndex + 1;
-      const style = rowNumber === 1 ? 1 : rowNumber === 6 ? 2 : 0;
+      const isSectionHeader =
+        rowNumber === 1 ||
+        rowNumber === mainHeaderRow ||
+        values[0] === "Crianças separadas por faixa etária" ||
+        (typeof values[0] === "string" && AGE_GROUPS.some((group) => String(values[0]).startsWith(group.label))) ||
+        values.join("|") === "Nº|Convidado|Idade|Responsável|WhatsApp";
+      const style = rowNumber === 1 ? 1 : isSectionHeader ? 2 : 0;
       const cells = values
         .map((value, columnIndex) => xlsxCell(value, rowNumber, columnIndex, style))
         .join("");
@@ -147,15 +251,17 @@ function makeSheetXml(payload: AttendanceExportPayload) {
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:F${Math.max(6, data.length)}"/>
+  <dimension ref="A1:H${Math.max(mainHeaderRow, data.length)}"/>
   <sheetViews><sheetView workbookViewId="0"/></sheetViews>
   <cols>
     <col min="1" max="1" width="7" customWidth="1"/>
     <col min="2" max="2" width="32" customWidth="1"/>
     <col min="3" max="3" width="14" customWidth="1"/>
-    <col min="4" max="4" width="30" customWidth="1"/>
+    <col min="4" max="4" width="12" customWidth="1"/>
     <col min="5" max="5" width="20" customWidth="1"/>
-    <col min="6" max="6" width="21" customWidth="1"/>
+    <col min="6" max="6" width="30" customWidth="1"/>
+    <col min="7" max="7" width="20" customWidth="1"/>
+    <col min="8" max="8" width="21" customWidth="1"/>
   </cols>
   <sheetData>${sheetRows}</sheetData>
   <pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.2" footer="0.2"/>
@@ -230,7 +336,6 @@ function makeZip(files: Array<{ name: string; content: string }>) {
     writeUint32(localView, 22, data.byteLength);
     writeUint16(localView, 26, name.byteLength);
     writeUint16(localView, 28, 0);
-
     localParts.push(localHeader, name, data);
 
     const centralHeader = new Uint8Array(46);
@@ -252,7 +357,6 @@ function makeZip(files: Array<{ name: string; content: string }>) {
     writeUint16(centralView, 36, 0);
     writeUint32(centralView, 38, 0);
     writeUint32(centralView, 42, localOffset);
-
     centralParts.push(centralHeader, name);
     localOffset += localHeader.byteLength + name.byteLength + data.byteLength;
   }
@@ -269,7 +373,6 @@ function makeZip(files: Array<{ name: string; content: string }>) {
   writeUint32(endView, 12, centralData.byteLength);
   writeUint32(endView, 16, localData.byteLength);
   writeUint16(endView, 20, 0);
-
   return concatBytes([localData, centralData, end]);
 }
 
@@ -301,17 +404,17 @@ export function exportAttendanceXlsx(payload: AttendanceExportPayload) {
     {
       name: "docProps/app.xml",
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Convite</Application></Properties>`,
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>CONVNIVER</Application></Properties>`,
     },
     {
       name: "docProps/core.xml",
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xmlEscape(`Lista de presença - ${payload.eventTitle}`)}</dc:title><dc:creator>Organizador</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created></cp:coreProperties>`,
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xmlEscape(`Lista de presença - ${payload.eventTitle}`)}</dc:title><dc:creator>CONVNIVER</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created></cp:coreProperties>`,
     },
     {
       name: "xl/workbook.xml",
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Lista de presença" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Lista e faixas etárias" sheetId="1" r:id="rId1"/></sheets></workbook>`,
     },
     {
       name: "xl/_rels/workbook.xml.rels",
@@ -378,8 +481,7 @@ function pdfLiteral(value: string) {
   let output = "";
   for (const character of value) {
     const codePoint = character.codePointAt(0) ?? 63;
-    let byte = codePoint <= 255 ? codePoint : cp1252[character] ?? 63;
-
+    const byte = codePoint <= 255 ? codePoint : cp1252[character] ?? 63;
     if (byte === 0x28 || byte === 0x29 || byte === 0x5c) {
       output += `\\${String.fromCharCode(byte)}`;
     } else if (byte >= 32 && byte <= 126) {
@@ -404,61 +506,104 @@ function pdfText(text: string, x: number, y: number, size = 9, bold = false) {
 function createPdf(payload: AttendanceExportPayload) {
   const rows = attendanceRows(payload);
   const counts = summary(rows);
-  const rowsPerPage = 39;
-  const pages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
+  const grouped = groupedChildren(rows);
+  const pageStreams: string[] = [];
+  const pageWidth = 841.89;
+  const pageHeight = 595.28;
+
+  const mainRowsPerPage = 25;
+  const mainPages = Math.max(1, Math.ceil(rows.length / mainRowsPerPage));
+
+  for (let pageIndex = 0; pageIndex < mainPages; pageIndex += 1) {
+    const pageRows = rows.slice(pageIndex * mainRowsPerPage, pageIndex * mainRowsPerPage + mainRowsPerPage);
+    let stream = "";
+    stream += pdfText("Lista de presença", 34, 560, 16, true);
+    stream += pdfText(truncate(payload.eventTitle, 95), 34, 540, 11, true);
+    stream += pdfText(`Total: ${counts.total}   Adultos: ${counts.adults}   Crianças: ${counts.children}`, 34, 520, 10, true);
+    stream += pdfText(
+      `0 a 3: ${counts.ageGroups["0-3"]}   3 a 6: ${counts.ageGroups["3-6"]}   6 a 12: ${counts.ageGroups["6-12"]}   12 a 17: ${counts.ageGroups["12-17"]}   Sem idade: ${counts.ageGroups.unknown}`,
+      34,
+      503,
+      8.5,
+    );
+    stream += pdfText(`Página ${pageIndex + 1} de ${mainPages} da lista`, 700, 560, 8);
+
+    stream += "0.75 w 34 487 m 808 487 l S\n";
+    stream += pdfText("Nº", 34, 472, 8, true);
+    stream += pdfText("Convidado", 58, 472, 8, true);
+    stream += pdfText("Tipo", 236, 472, 8, true);
+    stream += pdfText("Idade", 292, 472, 8, true);
+    stream += pdfText("Faixa etária", 335, 472, 8, true);
+    stream += pdfText("Responsável", 445, 472, 8, true);
+    stream += pdfText("WhatsApp", 635, 472, 8, true);
+    stream += "0.5 w 34 464 m 808 464 l S\n";
+
+    if (pageRows.length === 0) {
+      stream += pdfText("Nenhum convidado confirmado.", 34, 440, 10);
+    } else {
+      pageRows.forEach((row, index) => {
+        const y = 445 - index * 16;
+        stream += pdfText(String(row.number), 34, y, 8.2);
+        stream += pdfText(truncate(row.name, 28), 58, y, 8.2);
+        stream += pdfText(categoryLabel(row.category), 236, y, 8.2);
+        stream += pdfText(row.category === "child" ? (row.age === null ? "—" : String(row.age)) : "—", 292, y, 8.2);
+        stream += pdfText(truncate(row.ageGroup, 18), 335, y, 8.2);
+        stream += pdfText(truncate(row.contactName, 28), 445, y, 8.2);
+        stream += pdfText(truncate(row.whatsapp, 18), 635, y, 8.2);
+      });
+    }
+
+    pageStreams.push(stream);
+  }
+
+  for (const group of grouped) {
+    const rowsPerGroupPage = 26;
+    const pages = Math.max(1, Math.ceil(group.rows.length / rowsPerGroupPage));
+    for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
+      const pageRows = group.rows.slice(pageIndex * rowsPerGroupPage, pageIndex * rowsPerGroupPage + rowsPerGroupPage);
+      let stream = "";
+      stream += pdfText("Crianças por faixa etária", 34, 560, 16, true);
+      stream += pdfText(`${group.label} — ${group.rows.length} criança(s)`, 34, 536, 12, true);
+      stream += pdfText(truncate(payload.eventTitle, 95), 34, 518, 9);
+      stream += pdfText(`Página ${pageIndex + 1} de ${pages} desta faixa`, 690, 560, 8);
+
+      stream += "0.75 w 34 498 m 808 498 l S\n";
+      stream += pdfText("Nº original", 34, 482, 8, true);
+      stream += pdfText("Convidado", 100, 482, 8, true);
+      stream += pdfText("Idade", 350, 482, 8, true);
+      stream += pdfText("Responsável", 415, 482, 8, true);
+      stream += pdfText("WhatsApp", 650, 482, 8, true);
+      stream += "0.5 w 34 474 m 808 474 l S\n";
+
+      if (pageRows.length === 0) {
+        stream += pdfText("Nenhuma criança nesta faixa.", 34, 450, 10);
+      } else {
+        pageRows.forEach((row, index) => {
+          const y = 455 - index * 16;
+          stream += pdfText(String(row.number), 34, y, 8.5);
+          stream += pdfText(truncate(row.name, 38), 100, y, 8.5);
+          stream += pdfText(row.age === null ? "—" : String(row.age), 350, y, 8.5);
+          stream += pdfText(truncate(row.contactName, 32), 415, y, 8.5);
+          stream += pdfText(truncate(row.whatsapp, 18), 650, y, 8.5);
+        });
+      }
+      pageStreams.push(stream);
+    }
+  }
+
   const objects: string[] = [];
   const pageIds: number[] = [];
-
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
   objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
   objects[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
 
-  for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
+  pageStreams.forEach((stream, pageIndex) => {
     const pageId = 5 + pageIndex * 2;
     const contentId = pageId + 1;
     pageIds.push(pageId);
-
-    const pageRows = rows.slice(
-      pageIndex * rowsPerPage,
-      pageIndex * rowsPerPage + rowsPerPage,
-    );
-
-    let stream = "";
-    stream += pdfText("Lista de presença", 34, 806, 16, true);
-    stream += pdfText(truncate(payload.eventTitle, 70), 34, 786, 11, true);
-    stream += pdfText(
-      `Total: ${counts.total}   Adultos: ${counts.adults}   Crianças: ${counts.children}`,
-      34,
-      765,
-      10,
-      true,
-    );
-    stream += pdfText(`Página ${pageIndex + 1} de ${pages}`, 500, 806, 8);
-
-    stream += "0.75 w 34 746 m 560 746 l S\n";
-    stream += pdfText("Nº", 34, 730, 8, true);
-    stream += pdfText("Convidado", 58, 730, 8, true);
-    stream += pdfText("Tipo", 250, 730, 8, true);
-    stream += pdfText("Responsável", 315, 730, 8, true);
-    stream += pdfText("WhatsApp", 458, 730, 8, true);
-    stream += "0.5 w 34 722 m 560 722 l S\n";
-
-    if (pageRows.length === 0) {
-      stream += pdfText("Nenhum convidado confirmado.", 34, 700, 10);
-    } else {
-      pageRows.forEach((row, index) => {
-        const y = 704 - index * 16;
-        stream += pdfText(String(row.number), 34, y, 8.5);
-        stream += pdfText(truncate(row.name, 30), 58, y, 8.5);
-        stream += pdfText(categoryLabel(row.category), 250, y, 8.5);
-        stream += pdfText(truncate(row.contactName, 22), 315, y, 8.5);
-        stream += pdfText(truncate(row.whatsapp, 18), 458, y, 8.5);
-      });
-    }
-
-    objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
+    objects[pageId] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`;
     objects[contentId] = `<< /Length ${stream.length} >>\nstream\n${stream}endstream`;
-  }
+  });
 
   objects[2] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
 
@@ -476,7 +621,6 @@ function createPdf(payload: AttendanceExportPayload) {
     pdf += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
   }
   pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
   return new TextEncoder().encode(pdf);
 }
 
