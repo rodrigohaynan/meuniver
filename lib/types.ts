@@ -2,6 +2,7 @@ export type InvitationStatus = "draft" | "published";
 export type AgeUnit = "years" | "months";
 export type LayoutKey = "elegant" | "modern" | "kids";
 export type GiftReservationMode = "single" | "multiple";
+export type InvitationBillingStatus = "free" | "pending" | "paid" | "exempt" | "refunded";
 
 export type GiftProfileItem = {
   label: string;
@@ -35,6 +36,10 @@ export type Invitation = {
   gift_profile: GiftProfileItem[];
   rsvp_enabled: boolean;
   pix_gift_enabled: boolean;
+  billing_status: InvitationBillingStatus;
+  billing_amount: number;
+  billing_paid_at: string | null;
+  billing_note: string;
   created_at: string;
   updated_at: string;
 };
@@ -101,4 +106,13 @@ export type CashGift = {
   payment_status: string;
   created_at: string;
   updated_at: string;
+};
+
+export type SiteSettings = {
+  invitation_charging_enabled: boolean;
+  invitation_price: number;
+  free_invites_per_user: number;
+  pix_platform_fee_percent: number;
+  reminder_feature_enabled: boolean;
+  currency: string;
 };
