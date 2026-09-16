@@ -59,6 +59,10 @@ export type Rsvp = {
   invitation_id: string;
   contact_name: string;
   whatsapp: string;
+  whatsapp_e164: string;
+  whatsapp_reminders_enabled: boolean;
+  last_whatsapp_reminder_at: string | null;
+  whatsapp_reminder_count: number;
   attendees: Array<{ name: string; category: "adult" | "child" }>;
   created_at: string;
 };
