@@ -50,12 +50,15 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminSupabaseClient();
-    const { data: invitation, error: invitationError } = await admin
-      .from("invitations")
-      .select("id, owner_id, event_title, host_name, status, pix_gift_enabled")
-      .eq("id", invitationId)
-      .eq("status", "published")
-      .maybeSingle();
+    const [{ data: invitation, error: invitationError }, { data: siteSettings }] = await Promise.all([
+      admin
+        .from("invitations")
+        .select("id, owner_id, event_title, host_name, status, pix_gift_enabled")
+        .eq("id", invitationId)
+        .eq("status", "published")
+        .maybeSingle(),
+      admin.from("site_settings").select("pix_platform_fee_percent").eq("id", true).maybeSingle(),
+    ]);
 
     if (invitationError) throw new Error(invitationError.message);
     if (!invitation || invitation.pix_gift_enabled !== true) {
@@ -64,7 +67,8 @@ export async function POST(request: Request) {
 
     const accessToken = await getSellerAccessToken(invitation.owner_id);
     const giftId = randomUUID();
-    const platformFee = money(amount * 0.05);
+    const feePercent = Math.max(0, Math.min(100, Number(siteSettings?.pix_platform_fee_percent ?? 5)));
+    const platformFee = money(amount * (feePercent / 100));
 
     const { error: createError } = await admin.from("cash_gifts").insert({
       id: giftId,
@@ -120,6 +124,7 @@ export async function POST(request: Request) {
         status: paymentStatus,
         amount,
         platformFee,
+        platformFeePercent: feePercent,
         qrCode,
         qrCodeBase64,
         ticketUrl,
