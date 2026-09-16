@@ -2,6 +2,22 @@
 
 import { useEffect } from "react";
 
+const NAME_GUIDANCE =
+  "Digite somente o nome de uma pessoa por campo, usando apenas letras e espaços. Ex.: Maria da Silva. Não use números, vírgulas, símbolos ou quantidades como “3 adultos”. Para incluir outra pessoa, use o botão + Adicionar pessoa.";
+
+const GENERIC_NAMES = new Set([
+  "adulto",
+  "adulta",
+  "adultos",
+  "adultas",
+  "crianca",
+  "criancas",
+  "menino",
+  "menina",
+  "meninos",
+  "meninas",
+]);
+
 function formatWhatsapp(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   if (!digits) return "";
@@ -10,8 +26,21 @@ function formatWhatsapp(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
-function stripDigitsFromName(value: string) {
-  return value.replace(/[0-9]/g, "");
+function normalizeNameKey(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function hasInvalidNameCharacters(value: string) {
+  return /[^\p{L}\s]/u.test(value);
+}
+
+function isGenericName(value: string) {
+  return GENERIC_NAMES.has(normalizeNameKey(value));
 }
 
 function replaceLeadingText(label: HTMLLabelElement, text: string) {
@@ -21,6 +50,33 @@ function replaceLeadingText(label: HTMLLabelElement, text: string) {
       return;
     }
   }
+}
+
+function isRsvpNameInput(target: HTMLInputElement, contactInput: HTMLInputElement) {
+  return (
+    target === contactInput ||
+    /^Outra pessoa\s+\d+/i.test(target.placeholder) ||
+    /^Pessoa\s+\d+/i.test(target.placeholder)
+  );
+}
+
+function configureNameInput(input: HTMLInputElement) {
+  input.inputMode = "text";
+  input.autocomplete = "name";
+  input.title = NAME_GUIDANCE;
+  input.dataset.convniverLastValid = input.value;
+  if (!input.placeholder) input.placeholder = "Digite somente um nome";
+}
+
+function showNameGuidance(input: HTMLInputElement) {
+  input.setCustomValidity(NAME_GUIDANCE);
+  input.setAttribute("aria-invalid", "true");
+  input.reportValidity();
+}
+
+function clearNameGuidance(input: HTMLInputElement) {
+  input.setCustomValidity("");
+  input.removeAttribute("aria-invalid");
 }
 
 export function RsvpFormGuard() {
@@ -60,9 +116,21 @@ export function RsvpFormGuard() {
       whatsappInput.title = "Informe no formato (XX) XXXXX-XXXX";
       whatsappInput.autocomplete = "tel-national";
 
+      configureNameInput(contactInput);
+      form.querySelectorAll<HTMLInputElement>("input").forEach((input) => {
+        if (isRsvpNameInput(input, contactInput)) configureNameInput(input);
+      });
+
       if (whatsappInput.value) {
         whatsappInput.value = formatWhatsapp(whatsappInput.value);
       }
+
+      const onFocusIn = (event: Event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (!isRsvpNameInput(target, contactInput)) return;
+        configureNameInput(target);
+      };
 
       const onInput = (event: Event) => {
         const target = event.target;
@@ -76,16 +144,28 @@ export function RsvpFormGuard() {
           return;
         }
 
-        const isNameInput =
-          target === contactInput ||
-          /^Outra pessoa\s+\d+/i.test(target.placeholder) ||
-          /^Pessoa\s+\d+/i.test(target.placeholder);
+        if (!isRsvpNameInput(target, contactInput)) return;
 
-        if (isNameInput) {
-          const next = stripDigitsFromName(target.value);
-          if (target.value !== next) target.value = next;
-          target.inputMode = "text";
-          target.autocomplete = "name";
+        configureNameInput(target);
+        const current = target.value;
+        const previous = target.dataset.convniverLastValid ?? "";
+
+        if (hasInvalidNameCharacters(current)) {
+          target.value = previous;
+          showNameGuidance(target);
+          return;
+        }
+
+        target.dataset.convniverLastValid = current;
+        clearNameGuidance(target);
+      };
+
+      const onBlur = (event: Event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (!isRsvpNameInput(target, contactInput)) return;
+        if (target.value.trim() && isGenericName(target.value)) {
+          showNameGuidance(target);
         }
       };
 
@@ -100,13 +180,34 @@ export function RsvpFormGuard() {
           return;
         }
         whatsappInput.setCustomValidity("");
+
+        const nameInputs = Array.from(form.querySelectorAll<HTMLInputElement>("input")).filter((input) =>
+          isRsvpNameInput(input, contactInput),
+        );
+
+        for (const input of nameInputs) {
+          const value = input.value.trim();
+          if (!value) continue;
+          if (hasInvalidNameCharacters(value) || isGenericName(value)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showNameGuidance(input);
+            input.focus();
+            return;
+          }
+          clearNameGuidance(input);
+        }
       };
 
+      form.addEventListener("focusin", onFocusIn, true);
       form.addEventListener("input", onInput, true);
+      form.addEventListener("blur", onBlur, true);
       form.addEventListener("submit", onSubmit, true);
 
       cleanupCurrent = () => {
+        form.removeEventListener("focusin", onFocusIn, true);
         form.removeEventListener("input", onInput, true);
+        form.removeEventListener("blur", onBlur, true);
         form.removeEventListener("submit", onSubmit, true);
       };
 
