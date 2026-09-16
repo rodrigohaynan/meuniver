@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { UserRound } from "lucide-react";
+import { ShieldCheck, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/logout-button";
@@ -12,6 +12,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
+  const [{ data: adminAccess }] = await Promise.all([
+    supabase.from("site_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+  ]);
   const displayName = String(user.user_metadata?.full_name ?? "").trim();
 
   return (
@@ -33,6 +36,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span className="hidden max-w-44 truncate text-sm text-[#806e72] lg:block">
               {displayName || user.email}
             </span>
+            {adminAccess && (
+              <Link
+                href="/admin"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-3 text-sm font-bold text-white transition hover:bg-[#68182d] sm:px-4"
+              >
+                <ShieldCheck className="size-4" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            )}
             <Link
               href="/painel/minha-conta"
               className="inline-flex h-10 items-center gap-2 rounded-full border border-[#dccdc5] bg-white px-3 text-sm font-bold text-[#684f55] transition hover:bg-[#fff9f5] sm:px-4"
