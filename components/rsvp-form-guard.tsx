@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const NAME_GUIDANCE =
   "Digite somente o nome de uma pessoa por campo, usando apenas letras e espaços. Ex.: Maria da Silva. Não use números, vírgulas, símbolos ou quantidades como “3 adultos”. Para incluir outra pessoa, use o botão + Adicionar pessoa.";
+
+const SHARE_TEXT =
+  "Estou usando o CONVNIVER para organizar convites, confirmações de presença e presentes. Gostei da experiência e quis te indicar.";
 
 const GENERIC_NAMES = new Set([
   "adulto",
@@ -79,10 +83,92 @@ function clearNameGuidance(input: HTMLInputElement) {
   input.removeAttribute("aria-invalid");
 }
 
+async function shareConvniver() {
+  const url = `${window.location.origin}/`;
+
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share({
+        title: "CONVNIVER — convites que aproximam",
+        text: SHARE_TEXT,
+        url,
+      });
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  }
+
+  const whatsappText = `${SHARE_TEXT}\n\n${url}`;
+  window.open(
+    `https://wa.me/?text=${encodeURIComponent(whatsappText)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
+
 export function RsvpFormGuard() {
   useEffect(() => {
+    const supabase = createClient();
     let cleanupCurrent: (() => void) | null = null;
     let observer: MutationObserver | null = null;
+    let successObserver: MutationObserver | null = null;
+    let loggedIn = false;
+
+    function updateSuccessOffer() {
+      if (!loggedIn) return;
+
+      const heading = Array.from(document.querySelectorAll("h3")).find(
+        (item) => item.textContent?.trim() === "Presença confirmada!",
+      );
+      if (!(heading instanceof HTMLElement)) return;
+
+      const modal = heading.closest("div.fixed");
+      if (!(modal instanceof HTMLElement)) return;
+
+      const promoTitle = Array.from(modal.querySelectorAll("p")).find(
+        (item) => item.textContent?.trim() === "Gostou do CONVNIVER?",
+      );
+      if (!(promoTitle instanceof HTMLParagraphElement)) return;
+
+      const promo = promoTitle.parentElement;
+      if (!(promo instanceof HTMLElement)) return;
+
+      promoTitle.textContent = "Está gostando do CONVNIVER? Indique para alguém.";
+
+      const paragraphs = Array.from(promo.querySelectorAll("p"));
+      const description = paragraphs.find((item) => item !== promoTitle);
+      if (description) {
+        description.textContent =
+          "Compartilhe com alguém que também queira criar convites e organizar confirmações de forma prática.";
+      }
+
+      const accountLink = promo.querySelector<HTMLAnchorElement>(
+        'a[href*="/entrar?modo=cadastro"]',
+      );
+      if (!accountLink) return;
+
+      const shareButton = document.createElement("button");
+      shareButton.type = "button";
+      shareButton.className = accountLink.className;
+      shareButton.textContent = "Compartilhar CONVNIVER";
+      shareButton.dataset.convniverShare = "true";
+      shareButton.addEventListener("click", () => void shareConvniver());
+      accountLink.replaceWith(shareButton);
+    }
+
+    void supabase.auth.getSession().then(({ data }) => {
+      loggedIn = Boolean(data.session?.user);
+      updateSuccessOffer();
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      loggedIn = Boolean(session?.user);
+      updateSuccessOffer();
+    });
+
+    successObserver = new MutationObserver(() => updateSuccessOffer());
+    successObserver.observe(document.body, { childList: true, subtree: true });
 
     function attach() {
       const heading = Array.from(document.querySelectorAll("h2")).find((item) =>
@@ -226,7 +312,9 @@ export function RsvpFormGuard() {
 
     return () => {
       observer?.disconnect();
+      successObserver?.disconnect();
       cleanupCurrent?.();
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
