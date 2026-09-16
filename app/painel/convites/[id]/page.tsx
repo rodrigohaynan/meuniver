@@ -20,7 +20,7 @@ export default async function InvitationEditorPage({ params }: { params: Promise
   ] = await Promise.all([
     supabase.from("invitations").select("*").eq("id", id).single(),
     supabase.from("gifts").select("*").eq("invitation_id", id).order("sort_order"),
-    supabase.from("rsvps").select("*").eq("invitation_id", id).order("created_at", { ascending: false }),
+    supabase.from("rsvps").select("*").eq("invitation_id", id).order("created_at", { ascending: true }),
     supabase.from("rsvp_declines").select("*").eq("invitation_id", id).order("created_at", { ascending: false }),
   ]);
 
