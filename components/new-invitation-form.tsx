@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, CircleDollarSign, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TEMPLATES } from "@/lib/themes";
 import type { GiftProfileItem } from "@/lib/types";
@@ -56,7 +56,13 @@ function buildGiftProfile(form: GiftForm): GiftProfileItem[] {
   return rows;
 }
 
-export function NewInvitationForm() {
+export function NewInvitationForm({
+  billingNotice = "",
+  billingRequired = false,
+}: {
+  billingNotice?: string;
+  billingRequired?: boolean;
+}) {
   const router = useRouter();
   const [templateKey, setTemplateKey] = useState(TEMPLATES[0].key);
   const [hostName, setHostName] = useState("");
@@ -137,19 +143,11 @@ export function NewInvitationForm() {
       <div className="mt-6 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
         <p className="text-sm font-bold text-[#594147]">Tipo de comemoração</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => { setAgeUnit("years"); setAge((value) => Math.max(1, value)); }}
-            className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "years" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}
-          >
+          <button type="button" onClick={() => { setAgeUnit("years"); setAge((value) => Math.max(1, value)); }} className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "years" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}>
             <strong className="block text-[#3c2028]">Aniversário</strong>
             <span className="mt-1 block text-xs text-[#806e72]">Idade em anos</span>
           </button>
-          <button
-            type="button"
-            onClick={() => { setAgeUnit("months"); setAge((value) => Math.max(1, Math.min(12, value > 12 ? 1 : value))); }}
-            className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "months" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}
-          >
+          <button type="button" onClick={() => { setAgeUnit("months"); setAge((value) => Math.max(1, Math.min(12, value > 12 ? 1 : value))); }} className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "months" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}>
             <strong className="block text-[#3c2028]">Mêsversário</strong>
             <span className="mt-1 block text-xs text-[#806e72]">De 1 a 12 meses, ideal para o primeiro ano</span>
           </button>
@@ -170,7 +168,6 @@ export function NewInvitationForm() {
       <details className="mt-5 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
         <summary className="cursor-pointer font-display text-xl font-bold text-[#3c2028]">Tamanhos e preferências para presentes <span className="font-sans text-sm font-normal text-[#806e72]">(opcional)</span></summary>
         <p className="mt-2 text-sm leading-6 text-[#806e72]">Preencha somente o que fizer sentido. Essas informações ajudam os convidados a escolher roupas, calçados e outros presentes no tamanho certo.</p>
-
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {GIFT_FIELDS.map((field) => (
             <label key={field.key}>
@@ -179,23 +176,19 @@ export function NewInvitationForm() {
             </label>
           ))}
         </div>
-
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label>
-            <span className="text-sm font-bold text-[#594147]">Cores preferidas</span>
-            <input value={giftForm.colors} onChange={(event) => updateGiftField("colors", event.target.value)} maxLength={160} placeholder="Ex.: azul, verde, tons neutros" className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" />
-          </label>
-          <label>
-            <span className="text-sm font-bold text-[#594147]">Temas, personagens, hobbies ou interesses</span>
-            <input value={giftForm.interests} onChange={(event) => updateGiftField("interests", event.target.value)} maxLength={200} placeholder="Ex.: dinossauros, futebol, desenho..." className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" />
-          </label>
+          <label><span className="text-sm font-bold text-[#594147]">Cores preferidas</span><input value={giftForm.colors} onChange={(event) => updateGiftField("colors", event.target.value)} maxLength={160} placeholder="Ex.: azul, verde, tons neutros" className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" /></label>
+          <label><span className="text-sm font-bold text-[#594147]">Temas, personagens, hobbies ou interesses</span><input value={giftForm.interests} onChange={(event) => updateGiftField("interests", event.target.value)} maxLength={200} placeholder="Ex.: dinossauros, futebol, desenho..." className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none focus:border-[#9e6172]" /></label>
         </div>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-[#594147]">Outras observações úteis</span>
-          <textarea value={giftForm.notes} onChange={(event) => updateGiftField("notes", event.target.value)} maxLength={400} rows={3} placeholder="Ex.: prefere roupas sem gola, já tem muitos brinquedos de determinado tipo..." className="mt-2 w-full rounded-xl border border-[#d8c7bd] px-3 py-3 outline-none focus:border-[#9e6172]" />
-        </label>
+        <label className="mt-4 block"><span className="text-sm font-bold text-[#594147]">Outras observações úteis</span><textarea value={giftForm.notes} onChange={(event) => updateGiftField("notes", event.target.value)} maxLength={400} rows={3} placeholder="Ex.: prefere roupas sem gola, já tem muitos brinquedos de determinado tipo..." className="mt-2 w-full rounded-xl border border-[#d8c7bd] px-3 py-3 outline-none focus:border-[#9e6172]" /></label>
       </details>
+
+      {billingNotice && (
+        <div className={`mt-5 flex items-start gap-3 rounded-2xl border px-4 py-4 ${billingRequired ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>
+          <CircleDollarSign className="mt-0.5 size-5 shrink-0" />
+          <p className="text-sm font-bold leading-6">{billingNotice}</p>
+        </div>
+      )}
 
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
