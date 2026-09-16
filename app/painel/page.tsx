@@ -47,14 +47,20 @@ export default async function DashboardPage() {
                 {!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">{invitation.age_unit === "months" ? "🍼" : "🎂"}</div>}
               </div>
               <div className="p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${invitation.status === "published" ? "bg-[#e5f3e8] text-[#326443]" : "bg-[#f4ece6] text-[#7b665c]"}`}>
-                    {invitation.status === "published" ? "Publicado" : "Rascunho"}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${invitation.status === "published" ? "bg-[#e5f3e8] text-[#326443]" : "bg-[#f4ece6] text-[#7b665c]"}`}>
+                      {invitation.status === "published" ? "Publicado" : "Rascunho"}
+                    </span>
+                    {invitation.billing_status === "pending" && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">Pagamento pendente</span>}
+                    {invitation.billing_status === "paid" && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">Pago</span>}
+                    {invitation.billing_status === "exempt" && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">Isento</span>}
+                  </div>
                   <span className="text-xs font-bold text-[#9a858a]">{invitation.event_date ? new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR") : "Sem data"}</span>
                 </div>
                 <h2 className="mt-4 font-display text-2xl font-bold text-[#3a1d25]">{invitation.event_title}</h2>
                 <p className="mt-1 text-sm text-[#806e72]">{invitation.host_name} • {formatAge(invitation.age, invitation.age_unit ?? "years")}</p>
+                {invitation.billing_status === "pending" && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">A publicação ficará disponível após a liberação financeira.</p>}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href={`/painel/convites/${invitation.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white"><Settings2 className="size-4" /> Editar</Link>
                   {invitation.status === "published" && (
