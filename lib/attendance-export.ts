@@ -21,7 +21,6 @@ type AttendanceRow = {
   name: string;
   category: AttendanceCategory;
   age: number | null;
-  ageGroup: string;
   contactName: string;
   whatsapp: string;
   createdAt: string;
@@ -59,11 +58,6 @@ function ageGroupKey(age: number | null): AgeGroupKey {
   return "12-17";
 }
 
-function ageGroupLabel(age: number | null) {
-  const key = ageGroupKey(age);
-  return AGE_GROUPS.find((group) => group.key === key)?.label ?? "Idade não informada";
-}
-
 function attendanceRows(payload: AttendanceExportPayload) {
   let number = 0;
   return payload.groups.flatMap((group) =>
@@ -74,7 +68,6 @@ function attendanceRows(payload: AttendanceExportPayload) {
         name: attendee.name.trim(),
         category: attendee.category,
         age,
-        ageGroup: attendee.category === "child" ? ageGroupLabel(age) : "—",
         contactName: group.contactName.trim(),
         whatsapp: group.whatsapp?.trim() ?? "",
         createdAt: formatDateTime(group.createdAt),
@@ -123,12 +116,6 @@ function formatDateTime(value?: string | null) {
 
 function categoryLabel(category: AttendanceCategory) {
   return category === "child" ? "Criança" : "Adulto";
-}
-
-function ageLabel(row: AttendanceRow) {
-  if (row.category !== "child") return "—";
-  if (row.age === null) return "Não informada";
-  return `${row.age} ${row.age === 1 ? "ano" : "anos"}`;
 }
 
 function safeFilename(value: string) {
@@ -197,13 +184,12 @@ function makeSheetXml(payload: AttendanceExportPayload) {
     ["Crianças de 12 a 17 anos", counts.ageGroups["12-17"]],
     ["Crianças sem idade informada", counts.ageGroups.unknown],
     [],
-    ["Nº", "Convidado", "Categoria", "Idade", "Faixa etária", "Responsável", "WhatsApp", "Confirmado em"],
+    ["Nº", "Convidado", "Categoria", "Idade", "Responsável", "WhatsApp", "Confirmado em"],
     ...rows.map((row) => [
       row.number,
       row.name,
       categoryLabel(row.category),
       row.category === "child" && row.age !== null ? row.age : "",
-      row.ageGroup,
       row.contactName,
       row.whatsapp,
       row.createdAt,
@@ -251,17 +237,16 @@ function makeSheetXml(payload: AttendanceExportPayload) {
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:H${Math.max(mainHeaderRow, data.length)}"/>
+  <dimension ref="A1:G${Math.max(mainHeaderRow, data.length)}"/>
   <sheetViews><sheetView workbookViewId="0"/></sheetViews>
   <cols>
     <col min="1" max="1" width="7" customWidth="1"/>
     <col min="2" max="2" width="32" customWidth="1"/>
     <col min="3" max="3" width="14" customWidth="1"/>
     <col min="4" max="4" width="12" customWidth="1"/>
-    <col min="5" max="5" width="20" customWidth="1"/>
-    <col min="6" max="6" width="30" customWidth="1"/>
-    <col min="7" max="7" width="20" customWidth="1"/>
-    <col min="8" max="8" width="21" customWidth="1"/>
+    <col min="5" max="5" width="30" customWidth="1"/>
+    <col min="6" max="6" width="20" customWidth="1"/>
+    <col min="7" max="7" width="21" customWidth="1"/>
   </cols>
   <sheetData>${sheetRows}</sheetData>
   <pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.2" footer="0.2"/>
@@ -508,48 +493,46 @@ function createPdf(payload: AttendanceExportPayload) {
   const counts = summary(rows);
   const grouped = groupedChildren(rows);
   const pageStreams: string[] = [];
-  const pageWidth = 841.89;
-  const pageHeight = 595.28;
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
 
-  const mainRowsPerPage = 25;
+  const mainRowsPerPage = 37;
   const mainPages = Math.max(1, Math.ceil(rows.length / mainRowsPerPage));
 
   for (let pageIndex = 0; pageIndex < mainPages; pageIndex += 1) {
     const pageRows = rows.slice(pageIndex * mainRowsPerPage, pageIndex * mainRowsPerPage + mainRowsPerPage);
     let stream = "";
-    stream += pdfText("Lista de presença", 34, 560, 16, true);
-    stream += pdfText(truncate(payload.eventTitle, 95), 34, 540, 11, true);
-    stream += pdfText(`Total: ${counts.total}   Adultos: ${counts.adults}   Crianças: ${counts.children}`, 34, 520, 10, true);
+    stream += pdfText("Lista de presença", 34, 806, 16, true);
+    stream += pdfText(truncate(payload.eventTitle, 70), 34, 786, 11, true);
+    stream += pdfText(`Total: ${counts.total}   Adultos: ${counts.adults}   Crianças: ${counts.children}`, 34, 765, 10, true);
     stream += pdfText(
       `0 a 3: ${counts.ageGroups["0-3"]}   3 a 6: ${counts.ageGroups["3-6"]}   6 a 12: ${counts.ageGroups["6-12"]}   12 a 17: ${counts.ageGroups["12-17"]}   Sem idade: ${counts.ageGroups.unknown}`,
       34,
-      503,
-      8.5,
+      748,
+      8,
     );
-    stream += pdfText(`Página ${pageIndex + 1} de ${mainPages} da lista`, 700, 560, 8);
+    stream += pdfText(`Página ${pageIndex + 1} de ${mainPages}`, 500, 806, 8);
 
-    stream += "0.75 w 34 487 m 808 487 l S\n";
-    stream += pdfText("Nº", 34, 472, 8, true);
-    stream += pdfText("Convidado", 58, 472, 8, true);
-    stream += pdfText("Tipo", 236, 472, 8, true);
-    stream += pdfText("Idade", 292, 472, 8, true);
-    stream += pdfText("Faixa etária", 335, 472, 8, true);
-    stream += pdfText("Responsável", 445, 472, 8, true);
-    stream += pdfText("WhatsApp", 635, 472, 8, true);
-    stream += "0.5 w 34 464 m 808 464 l S\n";
+    stream += "0.75 w 34 730 m 560 730 l S\n";
+    stream += pdfText("Nº", 34, 714, 8, true);
+    stream += pdfText("Convidado", 58, 714, 8, true);
+    stream += pdfText("Tipo", 230, 714, 8, true);
+    stream += pdfText("Idade", 282, 714, 8, true);
+    stream += pdfText("Responsável", 330, 714, 8, true);
+    stream += pdfText("WhatsApp", 465, 714, 8, true);
+    stream += "0.5 w 34 706 m 560 706 l S\n";
 
     if (pageRows.length === 0) {
-      stream += pdfText("Nenhum convidado confirmado.", 34, 440, 10);
+      stream += pdfText("Nenhum convidado confirmado.", 34, 680, 10);
     } else {
       pageRows.forEach((row, index) => {
-        const y = 445 - index * 16;
+        const y = 688 - index * 16;
         stream += pdfText(String(row.number), 34, y, 8.2);
-        stream += pdfText(truncate(row.name, 28), 58, y, 8.2);
-        stream += pdfText(categoryLabel(row.category), 236, y, 8.2);
-        stream += pdfText(row.category === "child" ? (row.age === null ? "—" : String(row.age)) : "—", 292, y, 8.2);
-        stream += pdfText(truncate(row.ageGroup, 18), 335, y, 8.2);
-        stream += pdfText(truncate(row.contactName, 28), 445, y, 8.2);
-        stream += pdfText(truncate(row.whatsapp, 18), 635, y, 8.2);
+        stream += pdfText(truncate(row.name, 27), 58, y, 8.2);
+        stream += pdfText(categoryLabel(row.category), 230, y, 8.2);
+        stream += pdfText(row.category === "child" ? (row.age === null ? "—" : String(row.age)) : "—", 282, y, 8.2);
+        stream += pdfText(truncate(row.contactName, 20), 330, y, 8.2);
+        stream += pdfText(truncate(row.whatsapp, 18), 465, y, 8.2);
       });
     }
 
@@ -557,34 +540,34 @@ function createPdf(payload: AttendanceExportPayload) {
   }
 
   for (const group of grouped) {
-    const rowsPerGroupPage = 26;
+    const rowsPerGroupPage = 40;
     const pages = Math.max(1, Math.ceil(group.rows.length / rowsPerGroupPage));
     for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
       const pageRows = group.rows.slice(pageIndex * rowsPerGroupPage, pageIndex * rowsPerGroupPage + rowsPerGroupPage);
       let stream = "";
-      stream += pdfText("Crianças por faixa etária", 34, 560, 16, true);
-      stream += pdfText(`${group.label} — ${group.rows.length} criança(s)`, 34, 536, 12, true);
-      stream += pdfText(truncate(payload.eventTitle, 95), 34, 518, 9);
-      stream += pdfText(`Página ${pageIndex + 1} de ${pages} desta faixa`, 690, 560, 8);
+      stream += pdfText("Crianças por faixa etária", 34, 806, 16, true);
+      stream += pdfText(`${group.label} — ${group.rows.length} criança(s)`, 34, 782, 12, true);
+      stream += pdfText(truncate(payload.eventTitle, 70), 34, 764, 9);
+      stream += pdfText(`Página ${pageIndex + 1} de ${pages}`, 500, 806, 8);
 
-      stream += "0.75 w 34 498 m 808 498 l S\n";
-      stream += pdfText("Nº original", 34, 482, 8, true);
-      stream += pdfText("Convidado", 100, 482, 8, true);
-      stream += pdfText("Idade", 350, 482, 8, true);
-      stream += pdfText("Responsável", 415, 482, 8, true);
-      stream += pdfText("WhatsApp", 650, 482, 8, true);
-      stream += "0.5 w 34 474 m 808 474 l S\n";
+      stream += "0.75 w 34 744 m 560 744 l S\n";
+      stream += pdfText("Nº", 34, 728, 8, true);
+      stream += pdfText("Convidado", 70, 728, 8, true);
+      stream += pdfText("Idade", 300, 728, 8, true);
+      stream += pdfText("Responsável", 345, 728, 8, true);
+      stream += pdfText("WhatsApp", 475, 728, 8, true);
+      stream += "0.5 w 34 720 m 560 720 l S\n";
 
       if (pageRows.length === 0) {
-        stream += pdfText("Nenhuma criança nesta faixa.", 34, 450, 10);
+        stream += pdfText("Nenhuma criança nesta faixa.", 34, 694, 10);
       } else {
         pageRows.forEach((row, index) => {
-          const y = 455 - index * 16;
+          const y = 702 - index * 16;
           stream += pdfText(String(row.number), 34, y, 8.5);
-          stream += pdfText(truncate(row.name, 38), 100, y, 8.5);
-          stream += pdfText(row.age === null ? "—" : String(row.age), 350, y, 8.5);
-          stream += pdfText(truncate(row.contactName, 32), 415, y, 8.5);
-          stream += pdfText(truncate(row.whatsapp, 18), 650, y, 8.5);
+          stream += pdfText(truncate(row.name, 35), 70, y, 8.5);
+          stream += pdfText(row.age === null ? "—" : String(row.age), 300, y, 8.5);
+          stream += pdfText(truncate(row.contactName, 20), 345, y, 8.5);
+          stream += pdfText(truncate(row.whatsapp, 18), 475, y, 8.5);
         });
       }
       pageStreams.push(stream);
