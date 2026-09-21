@@ -143,11 +143,11 @@ export async function GET(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${safeTitle} — CONVNIVER</title>
+<title>${safeTitle} — Convidata</title>
 <meta name="description" content="${safeDescription}">
 
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CONVNIVER">
+<meta property="og:site_name" content="Convidata">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="${safeTitle}">
 <meta property="og:description" content="${safeDescription}">
