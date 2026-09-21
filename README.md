@@ -1,6 +1,6 @@
-# Meu Convite — Plataforma multiusuário de convites
+# Convidata — Convites digitais e gestão de convidados
 
-MVP baseado nos conceitos do convite da Liene, transformado em uma plataforma para vários usuários.
+Convidata é a marca da plataforma de convites digitais, confirmações de presença e organização de convidados. A criação guiada disponível atualmente oferece modelos de aniversário e mêsversário; outros tipos de evento serão incorporados em etapas futuras.
 
 ## O que já está incluído
 
@@ -64,6 +64,6 @@ No Netlify, conecte o repositório e faça o deploy normalmente. O projeto usa N
 
 A plataforma foi estruturada para permitir provedores sociais no futuro, mas eles ficam desativados na fase de testes para manter o MVP sem custos e sem dependências externas desnecessárias.
 
-## Nome
+## Marca e migração de domínio
 
-"Meu Convite" é um nome provisório no MVP. Ele pode ser substituído por uma marca definitiva depois.
+Marca pública: **Convidata**. O domínio e os links antigos em `convniver.netlify.app` permanecem ativos para não quebrar convites e integrações existentes. Não substitua `NEXT_PUBLIC_APP_URL` nem as URLs de autenticação e callbacks por um domínio novo antes de registrá-lo e configurá-lo no Netlify e no Supabase. Após a migração, estabeleça redirecionamentos do domínio antigo e atualize metadados, URLs de autenticação e credenciais dos provedores externos. O nome da marca não depende do nome técnico do repositório GitHub ou do site Netlify.
