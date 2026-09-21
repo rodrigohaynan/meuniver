@@ -54,7 +54,7 @@ export function PaymentSettings() {
             </span>
             <h2 className="mt-4 font-display text-3xl font-bold text-[#351820]">Presentes em PIX</h2>
             <p className="mt-2 text-sm leading-6 text-[#78666b]">
-              Conecte sua conta Mercado Pago para que convidados que não possam comparecer possam enviar um presente em PIX. O Convidata cobra 5% do valor do presente por meio do split automático do marketplace.
+              Conecte sua conta Mercado Pago para que convidados que não possam comparecer possam enviar um presente em PIX. A Convidata cobra 5% do valor do presente por meio do split automático do marketplace.
             </p>
           </div>
 
@@ -95,7 +95,7 @@ export function PaymentSettings() {
           <div className="mt-6 rounded-2xl border border-[#e3d6ce] bg-[#faf6f3] p-5">
             <p className="font-bold text-[#4e343a]">Conecte sua conta para começar</p>
             <p className="mt-1 text-sm leading-6 text-[#76666a]">
-              Você será levado ao Mercado Pago para autorizar o Convidata. O site não recebe nem armazena sua senha do Mercado Pago.
+              Você será levado ao Mercado Pago para autorizar a Convidata. O site não recebe nem armazena sua senha do Mercado Pago.
             </p>
             <a
               href="/api/mercadopago/connect"
@@ -112,7 +112,7 @@ export function PaymentSettings() {
       <section className="rounded-[1.7rem] border border-[#e4d8d0] bg-[#fffdfa] p-5 text-sm leading-6 text-[#6f5d62] sm:p-6">
         <p className="font-bold text-[#4e343a]">Como o dinheiro é dividido</p>
         <p className="mt-2">
-          O pagamento é criado na conta Mercado Pago do organizador usando o recurso de split de marketplace. O Convidata recebe 5% como taxa da plataforma. As tarifas de processamento do Mercado Pago são cobradas conforme as condições da conta do organizador, portanto o valor líquido recebido pelo organizador pode ser menor que 95% do valor bruto.
+          O pagamento é criado na conta Mercado Pago do organizador usando o recurso de split de marketplace. A Convidata recebe 5% como taxa da plataforma. As tarifas de processamento do Mercado Pago são cobradas conforme as condições da conta do organizador, portanto o valor líquido recebido pelo organizador pode ser menor que 95% do valor bruto.
         </p>
       </section>
     </div>
