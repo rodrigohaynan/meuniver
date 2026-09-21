@@ -491,7 +491,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
             <h3 className="mt-4 font-display text-3xl font-bold">Presença confirmada!</h3>
             <p className="mt-2 text-sm leading-6 text-[#806e72]">{addedCount === 1 ? "1 pessoa foi adicionada à lista." : `${addedCount} pessoas foram adicionadas à lista.`} Se este responsável já tinha uma confirmação anterior, os nomes já existentes não foram duplicados.</p>
             <div className="mt-6 rounded-2xl bg-[#fff6f1] p-5 text-left">
-              <p className="font-bold text-[#5d313e]">Gostou do Convidata?</p>
+              <p className="font-bold text-[#5d313e]">Gostou da Convidata?</p>
               <p className="mt-1 text-sm leading-6 text-[#76666a]">Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.</p>
               <a href="/entrar?modo=cadastro&origem=confirmacao" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#7d1f37] px-5 font-bold text-white">Criar minha conta</a>
             </div>
