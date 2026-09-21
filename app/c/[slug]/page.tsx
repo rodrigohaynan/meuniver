@@ -32,23 +32,9 @@ const getPublishedInvitation = cache(
 );
 
 async function appBaseUrl() {
-  const candidates = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.URL,
-    process.env.DEPLOY_PRIME_URL,
-  ];
-
-  for (const value of candidates) {
-    const clean = value?.trim();
-    if (!clean) continue;
-
-    try {
-      return new URL(clean);
-    } catch {
-      // Tenta a próxima opção.
-    }
-  }
-
+  // O host real vem antes de variáveis configuradas manualmente:
+  // após renomear o site Netlify, NEXT_PUBLIC_APP_URL pode continuar
+  // apontando para o endereço antigo e quebrar o og:image local.
   const requestHeaders = await headers();
   const host =
     requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim() ||
@@ -61,9 +47,25 @@ async function appBaseUrl() {
       forwardedProto || (host.includes("localhost") ? "http" : "https");
 
     try {
-      return new URL(`${protocol}://${host}`);
+      const requestedUrl = new URL(`${protocol}://${host}`);
+      if (requestedUrl.hostname) return requestedUrl;
     } catch {
-      // Continua para localhost.
+      // Recorre ao endereço do deploy.
+    }
+  }
+
+  // URL é gerada automaticamente pelo Netlify e acompanha a renomeação.
+  // A configuração pública legada deve ser apenas o último recurso.
+  for (const value of [
+    process.env.URL,
+    process.env.DEPLOY_PRIME_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ]) {
+    if (!value?.trim()) continue;
+    try {
+      return new URL(value.trim());
+    } catch {
+      // Tenta a próxima opção.
     }
   }
 
@@ -174,25 +176,33 @@ export async function generateMetadata({
       title,
       description,
       url: socialUrl.toString(),
+      // WhatsApp frequentemente usa apenas a PRIMEIRA og:image.
+      // Para Théo, priorizar o JPEG estático local; a foto PNG original
+      // pode ser grande e deve ficar apenas como alternativa.
       images: [
-        ...(originalPreviewImage
-          ? [
-              {
-                url: originalPreviewImage,
-                alt: imageAlt,
-              },
-            ]
+        ...(slug === "theo-rhaian" && whatsappPreviewImage
+          ? [{
+              url: whatsappPreviewImage,
+              width: 1200,
+              height: 630,
+              type: "image/jpeg",
+              alt: imageAlt,
+            }]
           : []),
-        ...(whatsappPreviewImage
-          ? [
-              {
-                url: whatsappPreviewImage,
-                width: 1200,
-                height: 630,
-                type: "image/jpeg",
-                alt: imageAlt,
-              },
-            ]
+        ...(originalPreviewImage
+          ? [{
+              url: originalPreviewImage,
+              alt: imageAlt,
+            }]
+          : []),
+        ...(slug !== "theo-rhaian" && whatsappPreviewImage
+          ? [{
+              url: whatsappPreviewImage,
+              width: 1200,
+              height: 630,
+              type: "image/jpeg",
+              alt: imageAlt,
+            }]
           : []),
       ],
     },
@@ -200,11 +210,13 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: originalPreviewImage
-        ? [originalPreviewImage]
-        : whatsappPreviewImage
-          ? [whatsappPreviewImage]
-          : undefined,
+      images: slug === "theo-rhaian" && whatsappPreviewImage
+        ? [whatsappPreviewImage]
+        : originalPreviewImage
+          ? [originalPreviewImage]
+          : whatsappPreviewImage
+            ? [whatsappPreviewImage]
+            : undefined,
     },
   };
 }
