@@ -20,7 +20,7 @@ export default async function DashboardPage() {
         <div>
           <p className="text-sm font-bold uppercase tracking-[.16em] text-[#9a7438]">Painel</p>
           <h1 className="mt-2 font-display text-4xl font-bold text-[#351820]">Meus convites</h1>
-          <p className="mt-2 text-[#78666b]">Crie, personalize, publique e acompanhe aniversários e mêsversários.</p>
+          <p className="mt-2 text-[#78666b]">Crie, personalize, publique e acompanhe seus convites em um só lugar.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/painel/pagamentos" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-5 font-bold text-[#684f55]">
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
         <section className="mt-8 rounded-[2rem] border border-dashed border-[#d6c4ba] bg-white px-6 py-16 text-center">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#f4e7e0] text-[#7d1f37]"><CalendarDays className="size-6" /></span>
           <h2 className="mt-5 font-display text-2xl font-bold">Você ainda não criou nenhum convite.</h2>
-          <p className="mx-auto mt-2 max-w-lg text-[#806e72]">Escolha um modelo adulto ou infantil e personalize em poucos minutos.</p>
+          <p className="mx-auto mt-2 max-w-lg text-[#806e72]">Escolha um modelo e personalize seu convite em poucos minutos.</p>
           <Link href="/painel/novo" className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white"><Plus className="size-4" /> Criar agora</Link>
         </section>
       ) : (
