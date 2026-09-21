@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/logout-button";
+import { BrandMark } from "@/components/brand-mark";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient();
@@ -22,14 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <header className="sticky top-0 z-40 border-b border-[#e6d9d2] bg-[#f8f4f1]/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-8">
           <Link href="/painel" className="flex items-center">
-            <Image
-              src="/brand/convniver-logo.png"
-              alt="CONVNIVER"
-              width={260}
-              height={89}
-              className="h-auto w-[145px] sm:w-[170px]"
-              priority
-            />
+            <BrandMark compact />
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-3">
