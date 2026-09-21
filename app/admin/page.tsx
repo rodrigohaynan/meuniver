@@ -43,7 +43,7 @@ export default async function AdminDashboardPage() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[.18em] text-[#9a7438]">Administração</p>
           <h1 className="mt-2 font-display text-4xl font-bold">Visão geral</h1>
-          <p className="mt-2 text-[#806e72]">Acompanhe operação, usuários, convites, presentes e receita do CONVNIVER.</p>
+          <p className="mt-2 text-[#806e72]">Acompanhe operação, usuários, convites, presentes e receita do Convidata.</p>
         </div>
         <Link href="/admin/relatorios" className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white">Gerar relatórios <ArrowRight className="size-4" /></Link>
       </div>
