@@ -88,8 +88,8 @@ function metadataDescription(invitation: Invitation) {
   const celebration = celebrationName(invitation);
 
   return host
-    ? `Você está convidado para celebrar o ${celebration} de ${host}. Confirme sua presença pelo CONVNIVER.`
-    : "Você está convidado para uma celebração especial. Confirme sua presença pelo CONVNIVER.";
+    ? `Você está convidado para celebrar o ${celebration} de ${host}. Confirme sua presença pelo Convidata.`
+    : "Você está convidado para uma celebração especial. Confirme sua presença pelo Convidata.";
 }
 
 function metadataTitle(invitation: Invitation) {
@@ -145,7 +145,7 @@ export async function generateMetadata({
 
   if (!invitation) {
     return {
-      title: "Convite não encontrado — CONVNIVER",
+      title: "Convite não encontrado — Convidata",
       robots: { index: false, follow: false },
     };
   }
@@ -162,7 +162,7 @@ export async function generateMetadata({
   }
 
   /*
-   * Estratégia social estável do CONVNIVER:
+   * Estratégia social estável do Convidata:
    *
    * 1) imagem original em primeiro lugar: preserva o comportamento do Instagram;
    * 2) JPEG 1200x630 persistido no Supabase em segundo lugar: o WhatsApp recebe
@@ -184,7 +184,7 @@ export async function generateMetadata({
 
   return {
     metadataBase: baseUrl,
-    title: `${title} — CONVNIVER`,
+    title: `${title} — Convidata`,
     description,
     alternates: {
       canonical: canonicalUrl.toString(),
@@ -192,7 +192,7 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       locale: "pt_BR",
-      siteName: "CONVNIVER",
+      siteName: "Convidata",
       title,
       description,
       url: socialUrl.toString(),
