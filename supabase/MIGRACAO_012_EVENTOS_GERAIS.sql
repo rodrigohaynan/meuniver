@@ -29,9 +29,9 @@ ALTER TABLE public.invitations
   ),
   ADD CONSTRAINT invitations_event_age_consistency_check CHECK (
     (
-      event_type = 'birthday' AND age_unit = 'years' AND age BETWEEN 1 AND 120
+      event_type = 'birthday' AND age_unit IS NOT NULL AND age IS NOT NULL AND age_unit = 'years' AND age BETWEEN 1 AND 120
     ) OR (
-      event_type = 'monthiversary' AND age_unit = 'months' AND age BETWEEN 1 AND 12
+      event_type = 'monthiversary' AND age_unit IS NOT NULL AND age IS NOT NULL AND age_unit = 'months' AND age BETWEEN 1 AND 12
     ) OR (
       event_type NOT IN ('birthday','monthiversary')
       AND age IS NULL AND age_unit IS NULL
