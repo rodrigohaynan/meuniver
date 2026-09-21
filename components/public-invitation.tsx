@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
-import { eventTypeFor, eventUsesAge } from "@/lib/event-types";
+import { eventTypeFor, eventTypeMeta, eventUsesAge } from "@/lib/event-types";
 import type { GiftItem, Invitation, Rsvp } from "@/lib/types";
 
 function shopeeSearch(name: string) {
@@ -471,7 +471,7 @@ export function PublicInvitation({
                 style={heroImageStyle(invitation)}
               />
             ) : (
-              <div className="grid h-full place-items-center text-7xl">{invitation.layout_key === "kids" ? "🎈" : "🎂"}</div>
+              <div className="grid h-full place-items-center text-7xl">{eventTypeMeta(eventTypeFor(invitation)).emoji}</div>
             )}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent" />
             {eventUsesAge(eventTypeFor(invitation)) && <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[var(--i-accent)] shadow-sm backdrop-blur">{formatAge(invitation.age, invitation.age_unit)}</span>}
