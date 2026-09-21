@@ -7,6 +7,7 @@ import { PublicInvitation } from "@/components/public-invitation";
 import { PublicRsvpForm } from "@/components/public-rsvp-form";
 import { PublicGiftExtras } from "@/components/public-gift-extras";
 import type { GiftItem, Invitation } from "@/lib/types";
+import { eventTypeFor, eventTypeMeta, defaultEventTitle } from "@/lib/event-types";
 
 export const dynamic = "force-dynamic";
 
@@ -69,40 +70,17 @@ async function appBaseUrl() {
   return new URL("http://localhost:3000");
 }
 
-function celebrationName(invitation: Invitation) {
-  return invitation.age_unit === "months" ? "mêsversário" : "aniversário";
-}
-
 function metadataDescription(invitation: Invitation) {
-  const text = (invitation.invitation_text ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
-
-  if (text) {
-    return text.length > 180
-      ? `${text.slice(0, 177).trimEnd()}...`
-      : text;
-  }
-
-  const host = (invitation.host_name ?? "").trim();
-  const celebration = celebrationName(invitation);
-
-  return host
-    ? `Você está convidado para celebrar o ${celebration} de ${host}. Confirme sua presença pelo Convidata.`
-    : "Você está convidado para uma celebração especial. Confirme sua presença pelo Convidata.";
+  const text = (invitation.invitation_text ?? "").trim().replace(/\s+/g, " ");
+  if (text) return text.length > 180 ? `${text.slice(0, 177).trimEnd()}...` : text;
+  const title = metadataTitle(invitation);
+  return `Você está convidado para ${title}. Confirme sua presença pela Convidata.`;
 }
 
 function metadataTitle(invitation: Invitation) {
   const eventTitle = (invitation.event_title ?? "").trim();
-  const host = (invitation.host_name ?? "").trim();
-  const label = invitation.age_unit === "months" ? "Mêsversário" : "Aniversário";
-
   if (eventTitle) return eventTitle;
-  if (host) return `${label} de ${host}`;
-
-  return invitation.age_unit === "months"
-    ? "Convite de mêsversário"
-    : "Convite de aniversário";
+  return defaultEventTitle(eventTypeFor(invitation), invitation.host_name ?? "");
 }
 
 function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
@@ -179,8 +157,8 @@ export async function generateMetadata({
       : absoluteUrl(invitation.share_image_url, baseUrl);
 
   const host = (invitation.host_name ?? "").trim();
-  const celebration = celebrationName(invitation);
-  const imageAlt = host ? `Convite de ${celebration} de ${host}` : title;
+  const occasion = eventTypeMeta(eventTypeFor(invitation)).label;
+  const imageAlt = host ? `Convite de ${occasion} — ${host}` : title;
 
   return {
     metadataBase: baseUrl,
