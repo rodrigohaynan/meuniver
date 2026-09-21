@@ -228,8 +228,8 @@ export function AuthCard() {
         {mode === "login"
           ? "Bem-vindo de volta"
           : signupFromConfirmation
-            ? "Sua presença já está confirmada. Agora venha para o Convidata."
-            : "Crie sua conta no Convidata"}
+            ? "Sua presença já está confirmada. Agora venha para a Convidata."
+            : "Crie sua conta na Convidata"}
       </h1>
       <p className="mt-2 text-sm leading-6 text-[#7c686d]">
         {mode === "login"
