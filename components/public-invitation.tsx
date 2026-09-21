@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
+import { eventTypeFor, eventUsesAge } from "@/lib/event-types";
 import type { GiftItem, Invitation, Rsvp } from "@/lib/types";
 
 function shopeeSearch(name: string) {
@@ -53,7 +54,7 @@ function isStoredSuggestionImage(value: string | null) {
   return Boolean(value?.includes("/storage/v1/object/public/invite-media/"));
 }
 
-function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {
+function formatAge(age: number | null, ageUnit: Invitation["age_unit"] = "years") {
   const value = Math.max(1, Math.round(Number(age) || 1));
   if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;
   return `${value} ${value === 1 ? "ano" : "anos"}`;
@@ -114,7 +115,7 @@ export function PublicInvitation({
     hero_image_x: initialInvitation.hero_image_x ?? 50,
     hero_image_y: initialInvitation.hero_image_y ?? 50,
     pix_gift_enabled: initialInvitation.pix_gift_enabled ?? true,
-    age_unit: initialInvitation.age_unit ?? "years",
+    age_unit: initialInvitation.age_unit,
   };
 
   const [gifts, setGifts] = useState(
@@ -473,7 +474,7 @@ export function PublicInvitation({
               <div className="grid h-full place-items-center text-7xl">{invitation.layout_key === "kids" ? "🎈" : "🎂"}</div>
             )}
             <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/20 to-transparent" />
-            <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[var(--i-accent)] shadow-sm backdrop-blur">{formatAge(invitation.age, invitation.age_unit)}</span>
+            {eventUsesAge(eventTypeFor(invitation)) && <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[var(--i-accent)] shadow-sm backdrop-blur">{formatAge(invitation.age, invitation.age_unit)}</span>}
           </div>
 
           <div className={`px-6 py-8 sm:px-10 sm:py-11 ${invitation.layout_key === "modern" ? "text-left" : "text-center"}`}>
@@ -481,6 +482,7 @@ export function PublicInvitation({
               <Sparkles className="size-3.5" /> Você está convidado
             </div>
             <h1 className="mt-3 font-display text-4xl font-bold leading-tight sm:text-6xl">{invitation.event_title}</h1>
+            {invitation.event_subtitle && <p className="mt-2 text-base font-semibold text-[var(--i-accent)]">{invitation.event_subtitle}</p>}
             {invitation.host_name && invitation.event_title.toLowerCase().indexOf(invitation.host_name.toLowerCase()) === -1 && (
               <p className="mt-2 font-display text-2xl font-semibold text-[var(--i-accent)]">{invitation.host_name}</p>
             )}
