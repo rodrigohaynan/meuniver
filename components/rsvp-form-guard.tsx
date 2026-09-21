@@ -7,7 +7,7 @@ const NAME_GUIDANCE =
   "Digite somente o nome de uma pessoa por campo, usando apenas letras e espaços. Ex.: Maria da Silva. Não use números, vírgulas, símbolos ou quantidades como “3 adultos”. Para incluir outra pessoa, use o botão + Adicionar pessoa.";
 
 const SHARE_TEXT =
-  "Estou usando o CONVNIVER para organizar convites, confirmações de presença e presentes. Gostei da experiência e quis te indicar.";
+  "Estou usando o Convidata para organizar convites, confirmações de presença e presentes. Gostei da experiência e quis te indicar.";
 
 const GENERIC_NAMES = new Set([
   "adulto",
@@ -68,7 +68,7 @@ function configureNameInput(input: HTMLInputElement) {
   input.inputMode = "text";
   input.autocomplete = "name";
   input.title = NAME_GUIDANCE;
-  input.dataset.convniverLastValid = input.value;
+  input.dataset.convidataLastValid = input.value;
   if (!input.placeholder) input.placeholder = "Digite somente um nome";
 }
 
@@ -83,13 +83,13 @@ function clearNameGuidance(input: HTMLInputElement) {
   input.removeAttribute("aria-invalid");
 }
 
-async function shareConvniver() {
+async function shareConvidata() {
   const url = `${window.location.origin}/`;
 
   if (typeof navigator.share === "function") {
     try {
       await navigator.share({
-        title: "CONVNIVER — convites que aproximam",
+        title: "Convidata — convites que aproximam",
         text: SHARE_TEXT,
         url,
       });
@@ -127,14 +127,14 @@ export function RsvpFormGuard() {
       if (!(modal instanceof HTMLElement)) return;
 
       const promoTitle = Array.from(modal.querySelectorAll("p")).find(
-        (item) => item.textContent?.trim() === "Gostou do CONVNIVER?",
+        (item) => item.textContent?.trim() === "Gostou do Convidata?",
       );
       if (!(promoTitle instanceof HTMLParagraphElement)) return;
 
       const promo = promoTitle.parentElement;
       if (!(promo instanceof HTMLElement)) return;
 
-      promoTitle.textContent = "Está gostando do CONVNIVER? Indique para alguém.";
+      promoTitle.textContent = "Está gostando do Convidata? Indique para alguém.";
 
       const paragraphs = Array.from(promo.querySelectorAll("p"));
       const description = paragraphs.find((item) => item !== promoTitle);
@@ -151,9 +151,9 @@ export function RsvpFormGuard() {
       const shareButton = document.createElement("button");
       shareButton.type = "button";
       shareButton.className = accountLink.className;
-      shareButton.textContent = "Compartilhar CONVNIVER";
-      shareButton.dataset.convniverShare = "true";
-      shareButton.addEventListener("click", () => void shareConvniver());
+      shareButton.textContent = "Compartilhar Convidata";
+      shareButton.dataset.convidataShare = "true";
+      shareButton.addEventListener("click", () => void shareConvidata());
       accountLink.replaceWith(shareButton);
     }
 
@@ -234,7 +234,7 @@ export function RsvpFormGuard() {
 
         configureNameInput(target);
         const current = target.value;
-        const previous = target.dataset.convniverLastValid ?? "";
+        const previous = target.dataset.convidataLastValid ?? "";
 
         if (hasInvalidNameCharacters(current)) {
           target.value = previous;
@@ -242,7 +242,7 @@ export function RsvpFormGuard() {
           return;
         }
 
-        target.dataset.convniverLastValid = current;
+        target.dataset.convidataLastValid = current;
         clearNameGuidance(target);
       };
 
