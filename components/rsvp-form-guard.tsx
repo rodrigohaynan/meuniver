@@ -127,14 +127,14 @@ export function RsvpFormGuard() {
       if (!(modal instanceof HTMLElement)) return;
 
       const promoTitle = Array.from(modal.querySelectorAll("p")).find(
-        (item) => item.textContent?.trim() === "Gostou do Convidata?",
+        (item) => item.textContent?.trim() === "Gostou da Convidata?",
       );
       if (!(promoTitle instanceof HTMLParagraphElement)) return;
 
       const promo = promoTitle.parentElement;
       if (!(promo instanceof HTMLElement)) return;
 
-      promoTitle.textContent = "Está gostando do Convidata? Indique para alguém.";
+      promoTitle.textContent = "Está gostando da Convidata? Indique para alguém.";
 
       const paragraphs = Array.from(promo.querySelectorAll("p"));
       const description = paragraphs.find((item) => item !== promoTitle);
