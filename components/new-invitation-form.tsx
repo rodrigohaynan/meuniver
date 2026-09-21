@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, CircleDollarSign, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TEMPLATES } from "@/lib/themes";
+import { EVENT_TYPES, eventTypeMeta, eventUsesAge, defaultEventTitle, defaultInvitationText, type EventType } from "@/lib/event-types";
 import type { GiftProfileItem } from "@/lib/types";
 
 function slugify(value: string) {
@@ -66,8 +67,12 @@ export function NewInvitationForm({
   const router = useRouter();
   const [templateKey, setTemplateKey] = useState(TEMPLATES[0].key);
   const [hostName, setHostName] = useState("");
-  const [ageUnit, setAgeUnit] = useState<"years" | "months">("years");
+  const [eventType, setEventType] = useState<EventType>("birthday");
   const [age, setAge] = useState(30);
+  const [eventSubtitle, setEventSubtitle] = useState("");
+  const ageUnit = eventType === "monthiversary" ? "months" : "years";
+  const usesAge = eventUsesAge(eventType);
+  const eventMeta = eventTypeMeta(eventType);
   const [giftForm, setGiftForm] = useState<GiftForm>(EMPTY_GIFT_FORM);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -88,7 +93,7 @@ export function NewInvitationForm({
 
       const template = TEMPLATES.find((item) => item.key === templateKey) ?? TEMPLATES[0];
       const suffix = Math.random().toString(36).slice(2, 6);
-      const prefix = ageUnit === "months" ? "mesversario" : "aniversario";
+      const prefix = eventType === "monthiversary" ? "mesversario" : eventType === "birthday" ? "aniversario" : eventType;
       const slug = `${prefix}-${slugify(hostName) || "convite"}-${suffix}`;
 
       const { data, error: insertError } = await supabase
@@ -97,18 +102,18 @@ export function NewInvitationForm({
           owner_id: user.id,
           slug,
           status: "draft",
-          event_title: `${ageUnit === "months" ? "Mêsversário" : "Aniversário"} de ${hostName.trim()}`,
+          event_type: eventType,
+          event_subtitle: eventSubtitle.trim() || null,
+          event_title: defaultEventTitle(eventType, hostName),
           host_name: hostName.trim(),
-          age: Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Math.round(age || 1))),
-          age_unit: ageUnit,
+          age: usesAge ? Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Math.round(age || 1))) : null,
+          age_unit: usesAge ? ageUnit : null,
           event_date: null,
           event_time: "",
           location_name: "",
           address: "",
           maps_url: "",
-          invitation_text: ageUnit === "months"
-            ? "Vamos celebrar mais um mês de vida! Sua presença vai deixar esse momento ainda mais especial."
-            : "Vamos celebrar juntos! Sua presença vai deixar esse dia ainda mais especial.",
+          invitation_text: defaultInvitationText(eventType),
           rsvp_note: "Confirme todas as pessoas que irão com você e informe se são adultos ou crianças.",
           theme_key: template.theme,
           layout_key: template.layout,
@@ -130,38 +135,55 @@ export function NewInvitationForm({
 
   return (
     <div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {TEMPLATES.map((template) => (
-          <button key={template.key} type="button" onClick={() => setTemplateKey(template.key)} className={`rounded-[1.5rem] border p-4 text-left transition ${templateKey === template.key ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#dfd0c6] bg-white hover:border-[#b98d99]"}`}>
-            <span className="text-3xl">{template.emoji}</span>
-            <p className="mt-3 font-display text-xl font-bold text-[#3c2028]">{template.label}</p>
-            <p className="mt-1 text-sm text-[#806e72]">{template.layout === "kids" ? "Layout infantil" : template.layout === "elegant" ? "Layout elegante" : "Layout moderno"}</p>
-          </button>
-        ))}
+      <div className="rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
+        <h2 className="font-display text-2xl font-bold text-[#3c2028]">1. Qual é o tipo de evento?</h2>
+        <p className="mt-1 text-sm text-[#806e72]">Selecione a ocasião para personalizar o convite e os campos necessários.</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {EVENT_TYPES.map((item) => (
+            <button key={item.key} type="button" onClick={() => {
+              setEventType(item.key);
+              if (item.key === "monthiversary") setAge((value) => Math.max(1, Math.min(12, value > 12 ? 1 : value)));
+            }} aria-pressed={eventType === item.key}
+              className={`flex min-h-20 flex-col items-start justify-center gap-1 rounded-xl border px-3 py-3 text-left transition ${eventType === item.key ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white hover:border-[#b98d99]"}`}>
+              <span className="text-xl" aria-hidden="true">{item.emoji}</span>
+              <span className="text-sm font-bold text-[#3c2028]">{item.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className={`mt-5 grid gap-4 ${usesAge ? "sm:grid-cols-[minmax(0,1fr)_160px]" : ""}`}>
+          <label>
+            <span className="text-sm font-bold text-[#594147]">{eventMeta.hostLabel}</span>
+            <input value={hostName} onChange={(event) => setHostName(event.target.value)} maxLength={80} placeholder={eventMeta.placeholder}
+              className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172] focus:ring-2 focus:ring-[#9e6172]/10" />
+          </label>
+          {usesAge && (
+            <label>
+              <span className="text-sm font-bold text-[#594147]">{ageUnit === "months" ? "Meses" : "Idade"}</span>
+              <input type="number" min={1} max={ageUnit === "months" ? 12 : 120} value={age}
+                onChange={(event) => setAge(Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Number(event.target.value) || 1)))}
+                className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
+            </label>
+          )}
+        </div>
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-[#594147]">Subtítulo do evento <span className="font-normal text-[#806e72]">(opcional)</span></span>
+          <input value={eventSubtitle} onChange={(event) => setEventSubtitle(event.target.value)} maxLength={160}
+            placeholder="Ex.: Uma noite para celebrar com amigos"
+            className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
+        </label>
       </div>
 
-      <div className="mt-6 rounded-[1.7rem] border border-[#dfd0c6] bg-white p-5 sm:p-6">
-        <p className="text-sm font-bold text-[#594147]">Tipo de comemoração</p>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <button type="button" onClick={() => { setAgeUnit("years"); setAge((value) => Math.max(1, value)); }} className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "years" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}>
-            <strong className="block text-[#3c2028]">Aniversário</strong>
-            <span className="mt-1 block text-xs text-[#806e72]">Idade em anos</span>
-          </button>
-          <button type="button" onClick={() => { setAgeUnit("months"); setAge((value) => Math.max(1, Math.min(12, value > 12 ? 1 : value))); }} className={`rounded-xl border px-4 py-3 text-left transition ${ageUnit === "months" ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white"}`}>
-            <strong className="block text-[#3c2028]">Mêsversário</strong>
-            <span className="mt-1 block text-xs text-[#806e72]">De 1 a 12 meses, ideal para o primeiro ano</span>
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_160px]">
-          <label>
-            <span className="text-sm font-bold text-[#594147]">Nome do aniversariante</span>
-            <input value={hostName} onChange={(event) => setHostName(event.target.value)} maxLength={80} placeholder="Ex.: Liene, Sofia, Miguel..." className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172] focus:ring-2 focus:ring-[#9e6172]/10" />
-          </label>
-          <label>
-            <span className="text-sm font-bold text-[#594147]">{ageUnit === "months" ? "Meses" : "Idade"}</span>
-            <input type="number" min={1} max={ageUnit === "months" ? 12 : 120} value={age} onChange={(event) => setAge(Math.max(1, Math.min(ageUnit === "months" ? 12 : 120, Number(event.target.value) || 1)))} className="mt-2 h-12 w-full rounded-xl border border-[#d8c7bd] px-4 outline-none focus:border-[#9e6172]" />
-          </label>
+      <div className="mt-6">
+        <h2 className="mb-3 font-display text-2xl font-bold text-[#3c2028]">2. Escolha o visual do convite</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {TEMPLATES.map((template) => (
+            <button key={template.key} type="button" onClick={() => setTemplateKey(template.key)} aria-pressed={templateKey === template.key}
+              className={`rounded-[1.4rem] border p-4 text-left transition ${templateKey === template.key ? "border-[#8e4056] bg-[#fff8f5] ring-2 ring-[#8e4056]/10" : "border-[#dfd0c6] bg-white hover:border-[#b98d99]"}`}>
+              <span className="text-2xl">{template.emoji}</span>
+              <p className="mt-3 font-display text-lg font-bold text-[#3c2028]">{template.label}</p>
+              <p className="mt-1 text-xs text-[#806e72]">{template.layout === "kids" ? "Layout infantil" : template.layout === "elegant" ? "Layout elegante" : "Layout moderno"}</p>
+            </button>
+          ))}
         </div>
       </div>
 
