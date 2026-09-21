@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
+import { eventTypeFor, defaultEventTitle } from "@/lib/event-types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,8 +23,8 @@ function titleFor(invitation: Invitation) {
   const host = (invitation.host_name ?? "").trim();
 
   if (eventTitle) return eventTitle;
-  if (host) return `Aniversário de ${host}`;
-  return "Convite de aniversário";
+  if (host) return defaultEventTitle(eventTypeFor(invitation), host);
+  return "Convite para um evento especial";
 }
 
 function descriptionFor(invitation: Invitation) {
@@ -40,7 +41,7 @@ function descriptionFor(invitation: Invitation) {
   const host = (invitation.host_name ?? "").trim();
 
   return host
-    ? `Você está convidado para celebrar o aniversário de ${host}.`
+    ? `Você está convidado para ${defaultEventTitle(eventTypeFor(invitation), host)}.`
     : "Você está convidado para uma celebração especial.";
 }
 
