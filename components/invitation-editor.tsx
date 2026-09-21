@@ -931,7 +931,7 @@ function MiniPreview({ invitation }: { invitation: Invitation }) {
   return (
     <div style={style} className="overflow-hidden rounded-[1.7rem] border border-[var(--p-border)] bg-[var(--p-panel)]">
       <div className="relative aspect-[4/3] overflow-hidden bg-[var(--p-soft)] sm:aspect-[16/8]">
-        {invitation.hero_image_url ? <img src={invitation.hero_image_url} alt="" className="h-full w-full object-cover" style={heroImageStyle(invitation)} /> : <div className="grid h-full place-items-center text-5xl">{invitation.layout_key === "kids" ? "🎈" : "🎂"}</div>}
+        {invitation.hero_image_url ? <img src={invitation.hero_image_url} alt="" className="h-full w-full object-cover" style={heroImageStyle(invitation)} /> : <div className="grid h-full place-items-center text-5xl">{eventTypeMeta(eventTypeFor(invitation)).emoji}</div>}
       </div>
       <div className={`px-6 py-7 sm:px-10 ${invitation.layout_key === "modern" ? "text-left" : "text-center"}`}>
         <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[var(--p-accent)]">Você está convidado</p>
