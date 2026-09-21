@@ -15,7 +15,7 @@ async function imageAsDataUrl(url: string) {
       cache: "no-store",
       headers: {
         accept: "image/avif,image/webp,image/png,image/jpeg,image/*",
-        "user-agent": "CONVNIVER-OG/1.0",
+        "user-agent": "Convidata-OG/1.0",
       },
     });
 
