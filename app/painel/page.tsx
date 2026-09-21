@@ -2,8 +2,9 @@ import Link from "next/link";
 import { ArrowUpRight, CalendarDays, CircleDollarSign, Plus, Settings2 } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
+import { eventTypeFor, eventTypeMeta, eventUsesAge } from "@/lib/event-types";
 
-function formatAge(age: number, ageUnit: Invitation["age_unit"] = "years") {
+function formatAge(age: number | null, ageUnit: Invitation["age_unit"] = "years") {
   const value = Math.max(1, Math.round(Number(age) || 1));
   if (ageUnit === "months") return `${value} ${value === 1 ? "mês" : "meses"}`;
   return `${value} ${value === 1 ? "ano" : "anos"}`;
@@ -44,7 +45,7 @@ export default async function DashboardPage() {
           {invitations.map((invitation) => (
             <article key={invitation.id} className="overflow-hidden rounded-[1.7rem] border border-[#e1d3cb] bg-white shadow-sm">
               <div className="h-36 bg-[#f3e8e2]" style={invitation.hero_image_url ? { backgroundImage: `url("${invitation.hero_image_url}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
-                {!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">{invitation.age_unit === "months" ? "🍼" : "🎂"}</div>}
+                {!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">{eventTypeMeta(eventTypeFor(invitation)).emoji}</div>}
               </div>
               <div className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -59,7 +60,7 @@ export default async function DashboardPage() {
                   <span className="text-xs font-bold text-[#9a858a]">{invitation.event_date ? new Date(`${invitation.event_date}T12:00:00`).toLocaleDateString("pt-BR") : "Sem data"}</span>
                 </div>
                 <h2 className="mt-4 font-display text-2xl font-bold text-[#3a1d25]">{invitation.event_title}</h2>
-                <p className="mt-1 text-sm text-[#806e72]">{invitation.host_name} • {formatAge(invitation.age, invitation.age_unit ?? "years")}</p>
+                <p className="mt-1 text-sm text-[#806e72]">{eventTypeMeta(eventTypeFor(invitation)).label}{invitation.host_name ? ` • ${invitation.host_name}` : ""}{eventUsesAge(eventTypeFor(invitation)) ? ` • ${formatAge(invitation.age, invitation.age_unit)}` : ""}</p>
                 {invitation.billing_status === "pending" && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">A publicação ficará disponível após a liberação financeira.</p>}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href={`/painel/convites/${invitation.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white"><Settings2 className="size-4" /> Editar</Link>
