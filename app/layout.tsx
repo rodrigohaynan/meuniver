@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const appName = process.env.NEXT_PUBLIC_APP_NAME || "CONVNIVER";
+const appName = process.env.NEXT_PUBLIC_APP_NAME || "Convidata";
 
 export const metadata: Metadata = {
-  title: `${appName} — Convites de aniversário personalizados`,
-  description: "Crie, personalize e compartilhe seu convite de aniversário online.",
+  title: `${appName} — Convites digitais para momentos especiais`,
+  description: "Crie e personalize convites digitais, organize confirmações de presença e compartilhe os momentos que importam.",
   icons: {
-    icon: "/brand/convniver-icon.png",
-    apple: "/brand/convniver-icon.png",
-    shortcut: "/brand/convniver-icon.png",
+    icon: "/brand/convidata-icon.svg",
+    apple: "/brand/convidata-icon.svg",
+    shortcut: "/brand/convidata-icon.svg",
   },
 };
 
