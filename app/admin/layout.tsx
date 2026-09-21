@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { BarChart3, CircleDollarSign, FileText, LayoutDashboard, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSiteAdminUser } from "@/lib/site-admin";
 import { LogoutButton } from "@/components/logout-button";
+import { BrandMark } from "@/components/brand-mark";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getSiteAdminUser();
@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-8">
           <div className="flex items-center gap-4">
             <Link href="/admin" className="flex items-center">
-              <Image src="/brand/convniver-logo.png" alt="CONVNIVER" width={260} height={89} className="h-auto w-[145px]" priority />
+              <BrandMark compact />
             </Link>
             <span className="hidden rounded-full bg-[#7d1f37] px-3 py-1 text-xs font-bold uppercase tracking-[.14em] text-white sm:inline">Admin</span>
           </div>
@@ -36,7 +36,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </nav>
           <div className="mt-4 border-t border-[#eee4de] pt-4 text-xs leading-5 text-[#8b767b]">
             <div className="flex items-center gap-2 font-bold text-[#684f55]"><BarChart3 className="size-4" /> Administração global</div>
-            <p className="mt-1">Área restrita ao proprietário do CONVNIVER.</p>
+            <p className="mt-1">Área restrita ao proprietário do Convidata.</p>
           </div>
         </aside>
 
