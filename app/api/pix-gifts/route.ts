@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         externalReference: giftId,
         amount,
         applicationFee: platformFee,
-        description: `Presente CONVNIVER - ${invitation.host_name || invitation.event_title || "convite"}`,
+        description: `Presente Convidata - ${invitation.host_name || invitation.event_title || "convite"}`,
         payerEmail: guestEmail,
         payerName: guestName.split(" ")[0] || guestName,
         payerCpf,
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       throw error;
     }
   } catch (error) {
-    console.error("[CONVNIVER] Erro ao criar presente PIX:", error);
+    console.error("[Convidata] Erro ao criar presente PIX:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Não foi possível gerar o PIX." },
       { status: 500 },
