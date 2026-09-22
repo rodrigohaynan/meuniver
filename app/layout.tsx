@@ -4,7 +4,7 @@ import "./globals.css";
 const appName = "Convidata";
 const shareTitle = "Convidata — Convites digitais para momentos especiais";
 const shareDescription = "Crie convites digitais personalizados, acompanhe as confirmações de presença e organize sua lista de presentes em um só lugar.";
-const shareImage = "https://convidata.netlify.app/brand-preview?v=2";
+const shareImage = "https://convidata.netlify.app/brand-preview.png?v=3";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://convidata.netlify.app"),
