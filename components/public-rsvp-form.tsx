@@ -366,7 +366,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
 
   return (
     <section style={style} className="bg-[var(--i-bg)] px-4 pb-12 text-[var(--i-text)] sm:px-6">
-      <div className="mx-auto max-w-4xl pt-10">
+      <div className="mx-auto max-w-4xl pt-3 sm:pt-5">
         <div className="text-center">
           <span className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--i-soft)] text-[var(--i-accent)]"><UsersRound className="size-5" /></span>
           <h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Confirme sua presença</h2>
