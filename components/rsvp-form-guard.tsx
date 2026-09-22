@@ -84,7 +84,7 @@ function clearNameGuidance(input: HTMLInputElement) {
 }
 
 async function shareConvidata() {
-  const url = `${window.location.origin}/`;
+  const url = `${window.location.origin}/?via=indicacao-convidata-3`;
 
   if (typeof navigator.share === "function") {
     try {
