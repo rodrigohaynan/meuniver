@@ -456,7 +456,7 @@ export function PublicInvitation({
   const visibleGifts = gifts.filter((gift) => !gift.reserved);
 
   return (
-    <main style={style} className={"overflow-hidden bg-[var(--i-bg)] text-[var(--i-text)] " + (invitation.rsvp_enabled || invitation.gift_enabled ? "min-h-screen" : "")}>
+    <main style={style} className={"relative isolate w-full max-w-full overflow-x-clip bg-[var(--i-bg)] text-[var(--i-text)] " + (invitation.rsvp_enabled || invitation.gift_enabled ? "min-h-screen" : "")}>
       <div className="pointer-events-none absolute left-[-8rem] top-16 size-72 rounded-full bg-[var(--i-soft)] opacity-55 blur-3xl" />
       <div className="pointer-events-none absolute right-[-7rem] top-[36rem] size-80 rounded-full bg-[var(--i-soft)] opacity-45 blur-3xl" />
 
