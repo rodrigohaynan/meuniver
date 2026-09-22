@@ -456,11 +456,11 @@ export function PublicInvitation({
   const visibleGifts = gifts.filter((gift) => !gift.reserved);
 
   return (
-    <main style={style} className="min-h-screen overflow-hidden bg-[var(--i-bg)] text-[var(--i-text)]">
+    <main style={style} className={"overflow-hidden bg-[var(--i-bg)] text-[var(--i-text)] " + (invitation.rsvp_enabled || invitation.gift_enabled ? "min-h-screen" : "")}>
       <div className="pointer-events-none absolute left-[-8rem] top-16 size-72 rounded-full bg-[var(--i-soft)] opacity-55 blur-3xl" />
       <div className="pointer-events-none absolute right-[-7rem] top-[36rem] size-80 rounded-full bg-[var(--i-soft)] opacity-45 blur-3xl" />
 
-      <section className="relative mx-auto max-w-5xl px-4 pb-14 pt-5 sm:px-6 sm:pt-8">
+      <section className={"relative mx-auto max-w-5xl px-4 pt-5 sm:px-6 sm:pt-8 " + (invitation.rsvp_enabled || invitation.gift_enabled ? "pb-14" : "pb-3 sm:pb-5")}>
         <div className={`overflow-hidden rounded-[2.1rem] border border-[var(--i-border)] bg-[var(--i-panel)] shadow-[0_18px_55px_rgba(58,28,37,.07)] ${invitation.layout_key === "kids" ? "ring-4 ring-[var(--i-soft)]" : ""}`}>
           <div className="relative aspect-[4/3] overflow-hidden bg-[var(--i-soft)] sm:aspect-[16/9]">
             {invitation.hero_image_url ? (
