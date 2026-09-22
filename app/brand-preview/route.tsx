@@ -2,6 +2,9 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "nodejs";
 
+const brandIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="20" fill="#7D1F37"/><g fill="none" stroke="#FFF9F4" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="23" width="36" height="25" rx="5" stroke-width="3.2"/><path d="M14 26 32 38 50 26" stroke-width="3.2"/><path d="m25 36-9 9m23-9 9 9" stroke-width="2.8"/></g><path d="m48 10 2.2 5.8L56 18l-5.8 2.2L48 26l-2.2-5.8L40 18l5.8-2.2L48 10Z" fill="#F0C88C"/></svg>`;
+const brandIconData = `data:image/svg+xml;base64,${Buffer.from(brandIcon).toString("base64")}`;
+
 export async function GET() {
   return new ImageResponse(
     (
@@ -12,200 +15,54 @@ export async function GET() {
           width: "100%",
           height: "100%",
           overflow: "hidden",
-          background: "linear-gradient(120deg, #ffffff 0%, #f7fbf6 76%, #e8f4e9 100%)",
-          color: "#16382e",
+          background: "linear-gradient(112deg, #FFFDFB 0%, #FBF5F1 64%, #F4E7E0 100%)",
+          color: "#351820",
           fontFamily: "Arial, sans-serif",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            width: 370,
-            height: 370,
-            top: -245,
-            right: -85,
-            borderRadius: "100%",
-            backgroundColor: "#e1f1e3",
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            width: 450,
-            height: 450,
-            right: -170,
-            bottom: -285,
-            borderRadius: "100%",
-            backgroundColor: "#e4f4e5",
-          }}
-        />
-
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            left: 54,
-            top: 42,
-            alignItems: "center",
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 62,
-              height: 62,
-              borderRadius: 20,
-              backgroundColor: "#e2f3e6",
-              color: "#2f7956",
-              fontSize: 44,
-            }}
-          >
-            ♡
-          </div>
-          <div style={{ display: "flex", fontSize: 42, fontWeight: 700, letterSpacing: -1 }}>
-            Convidata
+        <div style={{ display: "flex", position: "absolute", top: -220, right: -170, width: 570, height: 570, borderRadius: 570, backgroundColor: "#F0DBDC" }} />
+        <div style={{ display: "flex", position: "absolute", right: 30, bottom: -290, width: 610, height: 610, borderRadius: 610, backgroundColor: "#F8EAE0" }} />
+        <div style={{ display: "flex", position: "absolute", top: 58, left: 62, alignItems: "center" }}>
+          <img src={brandIconData} width="68" height="68" alt="" />
+          <div style={{ display: "flex", marginLeft: 15, alignItems: "baseline", fontSize: 47, fontWeight: 700, letterSpacing: -2, color: "#51202F" }}>
+            convidata<span style={{ color: "#BA795A" }}>.</span>
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            top: 156,
-            left: 56,
-            width: 690,
-            flexDirection: "column",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: 62, lineHeight: 1.08, fontWeight: 700, letterSpacing: -2 }}>
-            Convites digitais para
+        <div style={{ display: "flex", position: "absolute", left: 62, top: 171, width: 690, flexDirection: "column" }}>
+          <div style={{ display: "flex", fontSize: 58, fontWeight: 700, letterSpacing: -2, lineHeight: 1.1, color: "#351820" }}>
+            Um convite especial
           </div>
-          <div
-            style={{
-              display: "flex",
-              fontSize: 62,
-              lineHeight: 1.09,
-              fontWeight: 700,
-              letterSpacing: -2,
-              color: "#548766",
-            }}
-          >
-            momentos especiais
+          <div style={{ display: "flex", fontSize: 58, fontWeight: 700, letterSpacing: -2, lineHeight: 1.1, color: "#7D1F37" }}>
+            para reunir quem importa.
           </div>
-          <div
-            style={{
-              display: "flex",
-              maxWidth: 610,
-              marginTop: 29,
-              fontSize: 27,
-              lineHeight: 1.4,
-              color: "#486158",
-            }}
-          >
-            Crie convites personalizados, acompanhe as confirmações de presença e organize sua lista de presentes.
+          <div style={{ display: "flex", maxWidth: 620, marginTop: 26, fontSize: 26, lineHeight: 1.38, color: "#725F63" }}>
+            Personalize seu convite, acompanhe as confirmações de presença e organize sua lista de presentes.
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 31 }}>
-            {["Convites", "Confirmações", "Presentes"].map((item) => (
-              <div
-                key={item}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 99,
-                  backgroundColor: "#e9f5e9",
-                  border: "1px solid #c9e6d0",
-                  padding: "10px 16px",
-                  color: "#286345",
-                  fontSize: 20,
-                  fontWeight: 700,
-                }}
-              >
+          <div style={{ display: "flex", marginTop: 30, gap: 10 }}>
+            {["Convites digitais", "Confirmações", "Presentes"].map((item) => (
+              <div key={item} style={{ display: "flex", background: "#F4E7E0", border: "1px solid #E5CDC8", borderRadius: 40, padding: "11px 15px", color: "#7D1F37", fontSize: 18, fontWeight: 700 }}>
                 {item}
               </div>
             ))}
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            top: 112,
-            right: 82,
-            width: 300,
-            height: 385,
-            borderRadius: 20,
-            backgroundColor: "#b9d4c0",
-            transform: "rotate(8deg)",
-            boxShadow: "0 22px 45px rgba(23,65,43,0.12)",
-          }}
-        />
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            top: 92,
-            right: 103,
-            width: 300,
-            height: 385,
-            padding: "32px 27px",
-            border: "2px solid #e7d9b8",
-            borderRadius: 17,
-            backgroundColor: "#fffefb",
-            transform: "rotate(3deg)",
-            boxShadow: "0 16px 34px rgba(23,65,43,0.10)",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div style={{ display: "flex", color: "#648674", fontSize: 16, letterSpacing: 3 }}>
-            VOCÊ ESTÁ CONVIDADO(A)
-          </div>
-          <div style={{ display: "flex", marginTop: 25, fontSize: 64, color: "#b89a61" }}>♡</div>
-          <div style={{ display: "flex", marginTop: 12, fontSize: 36, lineHeight: 1.18, fontWeight: 700, textAlign: "center" }}>
-            Momentos especiais
-          </div>
-          <div style={{ display: "flex", marginTop: 26, color: "#648674", fontSize: 17, textAlign: "center" }}>
-            começam com pessoas especiais
-          </div>
+        <div style={{ display: "flex", position: "absolute", right: 85, top: 135, width: 286, height: 342, background: "#BA795A", borderRadius: 20, transform: "rotate(9deg)", boxShadow: "0 20px 50px rgba(81,32,47,.14)" }} />
+        <div style={{ display: "flex", position: "absolute", right: 109, top: 109, width: 286, height: 342, padding: 27, background: "#FFFCF8", borderRadius: 18, border: "2px solid #DEC5B2", transform: "rotate(3deg)", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: "0 15px 38px rgba(81,32,47,.13)" }}>
+          <div style={{ display: "flex", color: "#967A6E", fontSize: 15, letterSpacing: 2 }}>VOCÊ ESTÁ CONVIDADO(A)</div>
+          <div style={{ display: "flex", fontSize: 47, color: "#BA795A", marginTop: 22 }}>♡</div>
+          <div style={{ display: "flex", color: "#51202F", fontSize: 32, fontWeight: 700, textAlign: "center", lineHeight: 1.15, marginTop: 13 }}>Momentos especiais</div>
+          <div style={{ display: "flex", color: "#886A72", fontSize: 16, textAlign: "center", marginTop: 22 }}>começam com pessoas especiais</div>
+          <div style={{ display: "flex", width: 70, height: 2, marginTop: 21, background: "#F0C88C" }} />
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 64,
-            paddingLeft: 57,
-            paddingRight: 57,
-            alignItems: "center",
-            justifyContent: "space-between",
-            backgroundColor: "#e6f4e8",
-            color: "#315b46",
-          }}
-        >
-          <div style={{ display: "flex", fontSize: 23, fontWeight: 700 }}>
-            convidata.netlify.app
-          </div>
-          <div style={{ display: "flex", fontSize: 17, letterSpacing: 2 }}>
-            MAIS MOMENTOS ESPECIAIS, JUNTOS
-          </div>
+        <div style={{ display: "flex", position: "absolute", bottom: 0, left: 0, right: 0, height: 71, paddingLeft: 62, paddingRight: 62, alignItems: "center", background: "#7D1F37" }}>
+          <div style={{ display: "flex", color: "#FFF9F4", fontSize: 23, fontWeight: 700 }}>Seu momento especial, do seu jeito.</div>
+          <div style={{ display: "flex", marginLeft: "auto", color: "#F0C88C", fontSize: 17, letterSpacing: 1.5 }}>CONVITES QUE APROXIMAM</div>
         </div>
       </div>
     ),
-    {
-      width: 1200,
-      height: 630,
-      headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
-    },
+    { width: 1200, height: 630, headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" } },
   );
 }
