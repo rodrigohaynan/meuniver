@@ -7,7 +7,7 @@ const NAME_GUIDANCE =
   "Digite somente o nome de uma pessoa por campo, usando apenas letras e espaços. Ex.: Maria da Silva. Não use números, vírgulas, símbolos ou quantidades como “3 adultos”. Para incluir outra pessoa, use o botão + Adicionar pessoa.";
 
 const SHARE_TEXT =
-  "Estou usando o Convidata para organizar convites, confirmações de presença e presentes. Gostei da experiência e quis te indicar.";
+  "Estou usando o Convidata para organizar um momento especial e gostei da praticidade! ✨ Com ele, posso criar convites digitais personalizados, acompanhar as confirmações de presença e organizar a lista de presentes em um só lugar. Conheça também:";
 
 const GENERIC_NAMES = new Set([
   "adulto",
