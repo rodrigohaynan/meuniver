@@ -24,7 +24,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getTheme, LAYOUTS, THEMES } from "@/lib/themes";
 import { EVENT_TYPES, eventTypeFor, eventTypeMeta, eventUsesAge, defaultEventTitle, defaultInvitationText, type EventType } from "@/lib/event-types";
-import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
+import type { GiftItem, GiftReservation, GiftReservationMode, Invitation, Rsvp } from "@/lib/types";
 import { exportAttendancePdf, exportAttendanceXlsx } from "@/lib/attendance-export";
 
 type Tab = "content" | "appearance" | "photo" | "gifts" | "responses";
@@ -90,8 +90,9 @@ export function InvitationEditor({
   const [tab, setTab] = useState<Tab>("content");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [newGift, setNewGift] = useState({ name: "", description: "", price_hint: "", suggestion_url: "" });
+  const [newGift, setNewGift] = useState({ name: "", description: "", price_hint: "", suggestion_url: "", reservation_mode: "single" as GiftReservationMode });
   const [giftBusy, setGiftBusy] = useState(false);
+  const [giftModeBusy, setGiftModeBusy] = useState<string | null>(null);
   const [giftImageBusy, setGiftImageBusy] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
@@ -216,6 +217,7 @@ export function InvitationEditor({
       price_hint: newGift.price_hint.trim(),
       suggestion_url: suggestionUrl,
       suggestion_image_url: null,
+      reservation_mode: newGift.reservation_mode,
       sort_order: gifts.length + 1,
     }).select("*").single();
 
@@ -243,9 +245,38 @@ export function InvitationEditor({
     }
 
     setGifts((current) => [...current, gift]);
-    setNewGift({ name: "", description: "", price_hint: "", suggestion_url: "" });
+    setNewGift({ name: "", description: "", price_hint: "", suggestion_url: "", reservation_mode: "single" });
     setMessage(finalMessage);
     setGiftBusy(false);
+  }
+
+  async function changeGiftMode(gift: GiftItem, mode: GiftReservationMode) {
+    if (giftModeBusy || gift.reservation_mode === mode) return;
+    setGiftModeBusy(gift.id);
+    setMessage("");
+
+    // A função autenticada também recalcula "reserved", preservando as
+    // escolhas anteriores mesmo ao transformar um presente em sugestão aberta.
+    const { data, error } = await supabase.rpc("set_gift_reservation_mode_owner", {
+      p_gift_id: gift.id,
+      p_mode: mode,
+    });
+    const result = data as { ok?: boolean; error?: string; reserved?: boolean } | null;
+    if (error || !result?.ok) {
+      setMessage(error?.message ?? result?.error ?? "Não foi possível alterar o tipo do presente.");
+      setGiftModeBusy(null);
+      return;
+    }
+
+    setGifts((items) => items.map((item) =>
+      item.id === gift.id
+        ? { ...item, reservation_mode: mode, reserved: Boolean(result.reserved) }
+        : item,
+    ));
+    setMessage(mode === "multiple"
+      ? `“${gift.name}” agora é uma sugestão aberta: várias pessoas podem escolher.`
+      : `“${gift.name}” agora é um presente único.`);
+    setGiftModeBusy(null);
   }
 
   async function saveGift(gift: GiftItem) {
@@ -708,6 +739,19 @@ export function InvitationEditor({
                 <Field label="Observação"><Input value={newGift.price_hint} onChange={(value) => setNewGift({ ...newGift, price_hint: value })} placeholder="Cor, tamanho..." /></Field>
                 <div className="sm:col-span-2"><Field label="Descrição"><Input value={newGift.description} onChange={(value) => setNewGift({ ...newGift, description: value })} /></Field></div>
                 <div className="sm:col-span-2"><Field label="Link de sugestão"><Input value={newGift.suggestion_url} onChange={(value) => setNewGift({ ...newGift, suggestion_url: value })} placeholder="https://..." /></Field></div>
+                <fieldset className="sm:col-span-2">
+                  <legend className="mb-2 text-sm font-bold text-[#594147]">Como os convidados podem escolher este presente?</legend>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${newGift.reservation_mode === "multiple" ? "border-[#8e4056] bg-white ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white/70"}`}>
+                      <input type="radio" name="new-gift-reservation-mode" value="multiple" checked={newGift.reservation_mode === "multiple"} onChange={() => setNewGift((current) => ({ ...current, reservation_mode: "multiple" }))} className="mt-1 accent-[#7d1f37]" />
+                      <span><strong className="block text-sm text-[#3c2028]">Sugestão aberta</strong><span className="mt-1 block text-xs leading-5 text-[#806e72]">Ex.: fraldas, roupas e mimos. Várias pessoas podem escolher e a sugestão continua disponível.</span></span>
+                    </label>
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${newGift.reservation_mode === "single" ? "border-[#8e4056] bg-white ring-2 ring-[#8e4056]/10" : "border-[#d8c7bd] bg-white/70"}`}>
+                      <input type="radio" name="new-gift-reservation-mode" value="single" checked={newGift.reservation_mode === "single"} onChange={() => setNewGift((current) => ({ ...current, reservation_mode: "single" }))} className="mt-1 accent-[#7d1f37]" />
+                      <span><strong className="block text-sm text-[#3c2028]">Presente único</strong><span className="mt-1 block text-xs leading-5 text-[#806e72]">Ex.: bicicleta ou brinquedo específico. Fica indisponível após a primeira escolha.</span></span>
+                    </label>
+                  </div>
+                </fieldset>
                 <button type="button" onClick={() => void addGift()} disabled={giftBusy || newGift.name.trim().length < 2} className="h-10 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white disabled:opacity-50">{giftBusy ? "Adicionando…" : "Adicionar presente"}</button>
               </div>
 
@@ -721,6 +765,14 @@ export function InvitationEditor({
                         <Field label="Observação"><Input value={gift.price_hint} onChange={(value) => setGifts((items) => items.map((item) => item.id === gift.id ? { ...item, price_hint: value } : item))} /></Field>
                         <div className="sm:col-span-2"><Field label="Descrição"><Input value={gift.description} onChange={(value) => setGifts((items) => items.map((item) => item.id === gift.id ? { ...item, description: value } : item))} /></Field></div>
                         <div className="sm:col-span-2"><Field label="Link de sugestão"><Input value={gift.suggestion_url ?? ""} onChange={(value) => setGifts((items) => items.map((item) => item.id === gift.id ? { ...item, suggestion_url: value || null, suggestion_image_url: null } : item))} /></Field></div>
+                        <fieldset className="sm:col-span-2">
+                          <legend className="mb-2 text-xs font-bold text-[#806e72]">Tipo de escolha</legend>
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" disabled={Boolean(giftModeBusy)} aria-pressed={gift.reservation_mode === "multiple"} onClick={() => void changeGiftMode(gift, "multiple")} className={`rounded-full border px-3 py-2 text-xs font-bold disabled:opacity-50 ${gift.reservation_mode === "multiple" ? "border-[#7d1f37] bg-[#7d1f37] text-white" : "border-[#d8c7bd] bg-white text-[#684f55]"}`}>Sugestão aberta · várias escolhas</button>
+                            <button type="button" disabled={Boolean(giftModeBusy)} aria-pressed={gift.reservation_mode !== "multiple"} onClick={() => void changeGiftMode(gift, "single")} className={`rounded-full border px-3 py-2 text-xs font-bold disabled:opacity-50 ${gift.reservation_mode !== "multiple" ? "border-[#7d1f37] bg-[#7d1f37] text-white" : "border-[#d8c7bd] bg-white text-[#684f55]"}`}>Presente único</button>
+                            {giftModeBusy === gift.id && <span className="text-xs text-[#806e72]">Atualizando…</span>}
+                          </div>
+                        </fieldset>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 border-t border-[#eee4de] px-4 py-3">
