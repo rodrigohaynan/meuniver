@@ -1,14 +1,22 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { NewInvitationForm } from "@/components/new-invitation-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export default async function NewInvitationPage() {
   const supabase = await createServerSupabaseClient();
-  const [{ data: settings }, { count: invitationCount }] = await Promise.all([
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) redirect("/entrar");
+
+  const [{ data: settings }, { count: invitationCount, error: countError }] = await Promise.all([
     supabase.from("site_settings").select("invitation_charging_enabled,invitation_price,free_invites_per_user").eq("id", true).maybeSingle(),
-    supabase.from("invitations").select("id", { count: "exact", head: true }),
+    supabase.from("invitations").select("id", { count: "exact", head: true }).eq("owner_id", user.id),
   ]);
+  if (countError) throw new Error("Não foi possível verificar a franquia de convites.");
 
   const enabled = Boolean(settings?.invitation_charging_enabled) && Number(settings?.invitation_price ?? 0) > 0;
   const price = Number(settings?.invitation_price ?? 0);
