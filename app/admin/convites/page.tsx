@@ -148,7 +148,7 @@ export default async function AdminInvitationsPage({
                   </span>
                   <h2 className="mt-3 line-clamp-2 font-display text-xl font-bold text-[#351820]">{item.event_title || item.host_name || "Convite sem título"}</h2>
                   <p className="mt-2 break-words text-sm text-[#806e72]">
-                    Proprietário: {owner?.full_name || owner?.email || "Conta não identificada"}
+                    Proprietário: <Link href={adminListUrl("/admin/convites", { usuario: item.owner_id })} className="font-bold text-[#7d1f37] underline-offset-2 hover:underline">{owner?.full_name || owner?.email || "Conta não identificada"}</Link>
                     {owner?.full_name && owner?.email ? ` · ${owner.email}` : ""}
                   </p>
                   <p className="mt-1 text-xs text-[#8b767b]">
