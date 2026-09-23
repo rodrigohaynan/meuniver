@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, CalendarDays, ExternalLink, Gift, ShieldCheck } from "lucide-react";
 import { AdminDeleteInvitationButton } from "@/components/admin-delete-invitation-button";
+import { adminListUrl, isUuid } from "@/lib/admin-list-query";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getSiteAdminUser } from "@/lib/site-admin";
 import type { GiftProfileItem } from "@/lib/types";
@@ -20,7 +21,7 @@ function Field({ label, value }: { label: string; value: string | number | null 
   );
 }
 
-export default async function AdminInvitationDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminInvitationDetailsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ usuario?: string }> }) {
   const adminUser = await getSiteAdminUser();
   if (!adminUser) redirect("/painel");
 
@@ -35,6 +36,9 @@ export default async function AdminInvitationDetailsPage({ params }: { params: P
 
   if (invitationError) throw new Error("Não foi possível carregar o convite.");
   if (!invitation) notFound();
+  const { usuario } = await searchParams;
+  const backToOwner = usuario && isUuid(usuario) && usuario === invitation.owner_id ? usuario : "";
+  const listUrl = adminListUrl("/admin/convites", { usuario: backToOwner });
 
   const [{ data: profile, error: ownerError }, { data: gifts, error: giftsError }] = await Promise.all([
     admin.from("profiles").select("full_name,email").eq("id", invitation.owner_id).maybeSingle(),
@@ -51,7 +55,7 @@ export default async function AdminInvitationDetailsPage({ params }: { params: P
 
   return (
     <div className="space-y-6">
-      <Link href="/admin/convites" className="inline-flex items-center gap-2 text-sm font-bold text-[#7d1f37]">
+      <Link href={listUrl} className="inline-flex items-center gap-2 text-sm font-bold text-[#7d1f37]">
         <ArrowLeft className="size-4" /> Todos os convites
       </Link>
 
@@ -82,7 +86,7 @@ export default async function AdminInvitationDetailsPage({ params }: { params: P
                 Ver convite publicado <ExternalLink className="size-4" />
               </Link>
             )}
-            <AdminDeleteInvitationButton id={invitation.id} title={invitation.event_title || invitation.host_name || "Convite"} returnToList />
+            <AdminDeleteInvitationButton id={invitation.id} title={invitation.event_title || invitation.host_name || "Convite"} returnToList returnUrl={listUrl} />
           </div>
           <p className="mt-3 text-xs leading-5 text-[#947f83]">O administrador não pode editar este convite nesta área. A exclusão exige confirmação e também remove os dados associados ao convite.</p>
         </div>
