@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, CircleDollarSign, FileText, LayoutDashboard, UsersRound } from "lucide-react";
+import { BarChart3, CalendarDays, CircleDollarSign, FileText, LayoutDashboard, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSiteAdminUser } from "@/lib/site-admin";
 import { LogoutButton } from "@/components/logout-button";
@@ -31,6 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <nav className="space-y-1 text-sm font-bold">
             <AdminLink href="/admin" icon={<LayoutDashboard className="size-4" />}>Visão geral</AdminLink>
             <AdminLink href="/admin/usuarios" icon={<UsersRound className="size-4" />}>Usuários</AdminLink>
+            <AdminLink href="/admin/convites" icon={<CalendarDays className="size-4" />}>Convites</AdminLink>
             <AdminLink href="/admin/financeiro" icon={<CircleDollarSign className="size-4" />}>Financeiro</AdminLink>
             <AdminLink href="/admin/relatorios" icon={<FileText className="size-4" />}>Relatórios</AdminLink>
           </nav>
