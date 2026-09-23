@@ -98,40 +98,76 @@ export function InvitationEditor({
   const supabase = useMemo(() => createClient(), []);
   const theme = getTheme(invitation.theme_key);
 
-  async function saveInvitation() {
+  async function saveInvitation(nextStatus: Invitation["status"] = invitation.status) {
     if (saving) return;
     setSaving(true);
     setMessage("");
-    const { error } = await supabase
-      .from("invitations")
-      .update({
-        status: invitation.status,
-        event_title: invitation.event_title.trim(),
-        host_name: invitation.host_name.trim(),
-        event_type: eventTypeFor(invitation),
-        event_subtitle: invitation.event_subtitle?.trim() || null,
-        age: eventUsesAge(eventTypeFor(invitation)) ? Math.max(1, Math.min(invitation.age_unit === "months" ? 12 : 120, Math.round(invitation.age || 1))) : null,
-        age_unit: eventUsesAge(eventTypeFor(invitation)) ? invitation.age_unit : null,
-        event_date: invitation.event_date || null,
-        event_time: invitation.event_time,
-        location_name: invitation.location_name.trim(),
-        address: invitation.address.trim(),
-        maps_url: invitation.maps_url.trim(),
-        invitation_text: invitation.invitation_text.trim(),
-        rsvp_note: invitation.rsvp_note.trim(),
-        theme_key: invitation.theme_key,
-        layout_key: invitation.layout_key,
-        hero_image_url: invitation.hero_image_url,
-        hero_image_zoom: invitation.hero_image_zoom,
-        hero_image_x: invitation.hero_image_x,
-        hero_image_y: invitation.hero_image_y,
-        gift_enabled: invitation.gift_enabled,
-        rsvp_enabled: invitation.rsvp_enabled,
-      })
-      .eq("id", invitation.id);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setMessage("Sua sessão expirou. Entre novamente para salvar ou publicar o convite.");
+        return;
+      }
 
-    setSaving(false);
-    setMessage(error ? error.message : "Alterações salvas.");
+      // Salva os campos editados e a mudança de publicação em uma única operação.
+      // Somente a confirmação do banco pode alterar a indicação de status na tela.
+      const { data: saved, error } = await supabase
+        .from("invitations")
+        .update({
+          status: nextStatus,
+          event_title: invitation.event_title.trim(),
+          host_name: invitation.host_name.trim(),
+          event_type: eventTypeFor(invitation),
+          event_subtitle: invitation.event_subtitle?.trim() || null,
+          age: eventUsesAge(eventTypeFor(invitation)) ? Math.max(1, Math.min(invitation.age_unit === "months" ? 12 : 120, Math.round(invitation.age || 1))) : null,
+          age_unit: eventUsesAge(eventTypeFor(invitation)) ? invitation.age_unit : null,
+          event_date: invitation.event_date || null,
+          event_time: invitation.event_time,
+          location_name: invitation.location_name.trim(),
+          address: invitation.address.trim(),
+          maps_url: invitation.maps_url.trim(),
+          invitation_text: invitation.invitation_text.trim(),
+          rsvp_note: invitation.rsvp_note.trim(),
+          theme_key: invitation.theme_key,
+          layout_key: invitation.layout_key,
+          hero_image_url: invitation.hero_image_url,
+          hero_image_zoom: invitation.hero_image_zoom,
+          hero_image_x: invitation.hero_image_x,
+          hero_image_y: invitation.hero_image_y,
+          gift_enabled: invitation.gift_enabled,
+          rsvp_enabled: invitation.rsvp_enabled,
+        })
+        .eq("id", invitation.id)
+        .eq("owner_id", user.id)
+        .select("status,billing_status")
+        .maybeSingle();
+
+      if (error) {
+        setMessage(
+          nextStatus === "published"
+            ? `Não foi possível publicar: ${error.message}`
+            : `Não foi possível salvar: ${error.message}`,
+        );
+        return;
+      }
+      if (!saved || saved.status !== nextStatus) {
+        setMessage("O banco não confirmou a alteração. Recarregue a página e tente novamente.");
+        return;
+      }
+
+      setInvitation((current) => ({ ...current, status: saved.status as Invitation["status"] }));
+      setMessage(
+        nextStatus === "published"
+          ? "Convite publicado com sucesso! Agora você já pode abrir e compartilhar o link."
+          : invitation.status === "published"
+            ? "Convite voltou para rascunho e não está mais disponível ao público."
+            : "Alterações salvas com sucesso.",
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? `Não foi possível concluir: ${error.message}` : "Não foi possível concluir a operação. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function uploadHero(file: File | undefined) {
@@ -958,8 +994,8 @@ export function InvitationEditor({
           )}
 
           <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-[#eee3dc] pt-5">
-            <button type="button" onClick={() => void saveInvitation()} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar alterações</button>
-            <button type="button" onClick={() => setInvitation({ ...invitation, status: invitation.status === "published" ? "draft" : "published" })} className="h-11 rounded-full border border-[#d8c7bd] bg-white px-5 text-sm font-bold text-[#684f55]">{invitation.status === "published" ? "Voltar para rascunho" : "Marcar para publicar"}</button>
+            <button type="button" onClick={() => void saveInvitation()} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-5 font-bold text-[#684f55] disabled:opacity-50">{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar alterações</button>
+            <button type="button" onClick={() => void saveInvitation(invitation.status === "published" ? "draft" : "published")} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="size-4 animate-spin" /> : null}{saving ? "Aguarde..." : invitation.status === "published" ? "Voltar para rascunho" : "Publicar convite agora"}</button>
             {message && <span className="text-sm font-bold text-[#7c686d]">{message}</span>}
           </div>
         </div>
