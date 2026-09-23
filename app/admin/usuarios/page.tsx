@@ -45,7 +45,7 @@ export default async function AdminUsersPage({
   if (countsError || adminsError) throw new Error("Não foi possível carregar os dados das contas.");
 
   const invitationsByUser = new Map<string, number>((counts ?? []).map((item: { owner_id: string; invitations_count: number | string }) => [item.owner_id, Number(item.invitations_count)] as const));
-  const adminIds = new Set((admins ?? []).map((item) => item.user_id));
+  const adminIds = new Set<string>((admins ?? []).map((item: { user_id: string }) => item.user_id));
   const users: AdminUserRow[] = (profiles ?? []).map((profile) => ({
     ...profile,
     full_name: profile.full_name || "",
