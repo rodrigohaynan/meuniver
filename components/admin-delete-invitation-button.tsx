@@ -8,10 +8,12 @@ export function AdminDeleteInvitationButton({
   id,
   title,
   returnToList = false,
+  returnUrl,
 }: {
   id: string;
   title: string;
   returnToList?: boolean;
+  returnUrl?: string;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -34,7 +36,7 @@ export function AdminDeleteInvitationButton({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Não foi possível excluir o convite.");
-      if (returnToList) router.replace("/admin/convites");
+      if (returnToList) router.replace(returnUrl?.startsWith("/admin/convites") ? returnUrl : "/admin/convites");
       router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível excluir o convite.");
