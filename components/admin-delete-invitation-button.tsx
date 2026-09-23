@@ -7,11 +7,11 @@ import { Loader2, Trash2 } from "lucide-react";
 export function AdminDeleteInvitationButton({
   id,
   title,
-  onDeleted,
+  returnToList = false,
 }: {
   id: string;
   title: string;
-  onDeleted?: () => void;
+  returnToList?: boolean;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -34,8 +34,8 @@ export function AdminDeleteInvitationButton({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Não foi possível excluir o convite.");
-      if (onDeleted) onDeleted();
-      else router.refresh();
+      if (returnToList) router.replace("/admin/convites");
+      router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível excluir o convite.");
     } finally {
