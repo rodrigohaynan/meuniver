@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowUpRight, CalendarDays, CircleDollarSign, Plus, Settings2 } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
@@ -12,7 +13,20 @@ function formatAge(age: number | null, ageUnit: Invitation["age_unit"] = "years"
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase.from("invitations").select("*").order("created_at", { ascending: false });
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) redirect("/entrar");
+
+  // Convites publicados são visíveis publicamente para convidados, mas o painel
+  // do organizador deve listar SOMENTE os convites pertencentes à conta autenticada.
+  const { data, error } = await supabase
+    .from("invitations")
+    .select("*")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error("Não foi possível carregar seus convites.");
   const invitations = (data ?? []) as Invitation[];
 
   return (
