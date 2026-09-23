@@ -82,7 +82,7 @@ export default async function AdminDashboardPage() {
       </div>
 
       <article className="mt-6 overflow-hidden rounded-[1.6rem] border border-[#e3d6cf] bg-white shadow-sm">
-        <div className="border-b border-[#eee4de] px-5 py-4 sm:px-6"><h2 className="font-display text-2xl font-bold">Convites recentes</h2></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eee4de] px-5 py-4 sm:px-6"><h2 className="font-display text-2xl font-bold">Convites recentes</h2><Link href="/admin/convites" className="text-sm font-bold text-[#7d1f37]">Ver todos os convites <ArrowRight className="inline size-4" /></Link></div>
         <div className="divide-y divide-[#f0e7e2]">
           {invitationRows.slice(0, 8).map((item) => (
             <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6">
