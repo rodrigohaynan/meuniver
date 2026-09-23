@@ -8,7 +8,7 @@ export function listPage(raw: string | undefined) {
 // PostgREST .or(...) accepts filter expressions, not arbitrary user input.
 // Exclude filter delimiters and SQL LIKE wildcards before constructing them.
 export function listSearch(raw: string | undefined) {
-  return String(raw ?? "").trim().replace(/[^\p{L}\p{N}\s@.+-]/gu, " ").replace(/\s+/g, " ").slice(0, 80).trim();
+  return String(raw ?? "").trim().replace(/[^\p{L}\p{N}\s@._+-]/gu, " ").replace(/\s+/g, " ").slice(0, 80).trim();
 }
 
 export function isUuid(value: string) {
