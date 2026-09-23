@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GiftProfileEditor } from "@/components/gift-profile-editor";
@@ -11,20 +11,36 @@ import type { GiftItem, GiftReservation, Invitation, Rsvp } from "@/lib/types";
 export default async function InvitationEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) redirect("/entrar");
+
+  // Autorizar ANTES de carregar presentes, reservas e dados de convidados.
+  // Um convite publicado é público para visualização, não para edição.
+  const { data: invitationData, error: invitationError } = await supabase
+    .from("invitations")
+    .select("*")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  if (invitationError || !invitationData || invitationData.owner_id !== user.id) notFound();
 
   const [
-    { data: invitationData },
-    { data: giftsData },
-    { data: rsvpsData },
-    { data: declinesData },
+    { data: giftsData, error: giftsError },
+    { data: rsvpsData, error: rsvpsError },
+    { data: declinesData, error: declinesError },
   ] = await Promise.all([
-    supabase.from("invitations").select("*").eq("id", id).single(),
-    supabase.from("gifts").select("*").eq("invitation_id", id).order("sort_order"),
-    supabase.from("rsvps").select("*").eq("invitation_id", id).order("created_at", { ascending: true }),
-    supabase.from("rsvp_declines").select("*").eq("invitation_id", id).order("created_at", { ascending: false }),
+    supabase.from("gifts").select("*").eq("invitation_id", invitationData.id).order("sort_order"),
+    supabase.from("rsvps").select("*").eq("invitation_id", invitationData.id).order("created_at", { ascending: true }),
+    supabase.from("rsvp_declines").select("*").eq("invitation_id", invitationData.id).order("created_at", { ascending: false }),
   ]);
 
-  if (!invitationData) notFound();
+  if (giftsError || rsvpsError || declinesError) {
+    throw new Error("Não foi possível carregar os dados deste convite.");
+  }
 
   const gifts = (giftsData ?? []) as GiftItem[];
   const giftIds = gifts.map((gift) => gift.id);
