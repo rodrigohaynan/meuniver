@@ -35,6 +35,18 @@ type RsvpEditDraft = {
   attendees: Rsvp["attendees"];
 };
 
+type ManualRsvpAttendee = {
+  name: string;
+  category: "adult" | "child";
+  age: string;
+};
+
+type ManualRsvpDraft = {
+  contact_name: string;
+  whatsapp: string;
+  attendees: ManualRsvpAttendee[];
+};
+
 const PHOTO_ZOOM_MIN = 1;
 const PHOTO_ZOOM_MAX = 2.5;
 
@@ -87,6 +99,12 @@ export function InvitationEditor({
   const [editingRsvpId, setEditingRsvpId] = useState<string | null>(null);
   const [rsvpDraft, setRsvpDraft] = useState<RsvpEditDraft | null>(null);
   const [rsvpBusy, setRsvpBusy] = useState(false);
+  const [manualRsvpMessage, setManualRsvpMessage] = useState("");
+  const [manualRsvp, setManualRsvp] = useState<ManualRsvpDraft>({
+    contact_name: "",
+    whatsapp: "",
+    attendees: [{ name: "", category: "adult", age: "" }],
+  });
   const [tab, setTab] = useState<Tab>("content");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -431,6 +449,102 @@ export function InvitationEditor({
     setMessage("Reserva liberada.");
   }
 
+  async function addManualRsvp() {
+    if (rsvpBusy) return;
+
+    const attendees = manualRsvp.attendees.map((item) => ({
+      name: item.name.trim().replace(/\s+/g, " "),
+      category: item.category,
+      ...(item.category === "child" ? { age: Number(item.age) } : {}),
+    }));
+    const contactName = (manualRsvp.contact_name.trim() || attendees[0]?.name || "").replace(/\s+/g, " ");
+    const whatsapp = manualRsvp.whatsapp.trim();
+
+    if (contactName.length < 2) {
+      setManualRsvpMessage("Informe o nome do responsável ou o nome do primeiro convidado.");
+      return;
+    }
+    if (
+      attendees.length < 1
+      || attendees.length > 20
+      || attendees.some((item) => item.name.length < 2)
+    ) {
+      setManualRsvpMessage("Informe o nome de cada pessoa. É possível adicionar até 20 convidados por lançamento.");
+      return;
+    }
+    if (
+      manualRsvp.attendees.some((item) =>
+        item.category === "child"
+        && (!/^\d{1,2}$/.test(item.age) || Number(item.age) < 0 || Number(item.age) > 17),
+      )
+    ) {
+      setManualRsvpMessage("Informe a idade de cada criança, entre 0 e 17 anos.");
+      return;
+    }
+
+    setRsvpBusy(true);
+    setManualRsvpMessage("");
+    try {
+      const { data, error } = await supabase.rpc("add_rsvp_owner", {
+        p_invitation_id: invitation.id,
+        p_contact_name: contactName,
+        p_whatsapp: whatsapp,
+        p_attendees: attendees,
+      });
+      const result = data as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        rsvpId?: string;
+        addedCount?: number;
+      } | null;
+
+      if (error || !result?.ok) {
+        setManualRsvpMessage(error?.message ?? result?.error ?? "Não foi possível adicionar os convidados.");
+        return;
+      }
+
+      if (!result.rsvpId) {
+        setManualRsvpMessage(result.message ?? "Nenhum novo convidado foi adicionado.");
+        return;
+      }
+
+      const { data: savedRsvp, error: readError } = await supabase
+        .from("rsvps")
+        .select("*")
+        .eq("id", result.rsvpId)
+        .eq("invitation_id", invitation.id)
+        .maybeSingle();
+
+      if (readError || !savedRsvp) {
+        setManualRsvpMessage("Os convidados foram salvos, mas a lista não pôde ser atualizada agora. Recarregue a página.");
+        return;
+      }
+
+      setRsvps((items) => {
+        const exists = items.some((item) => item.id === savedRsvp.id);
+        return exists
+          ? items.map((item) => item.id === savedRsvp.id ? savedRsvp as Rsvp : item)
+          : [...items, savedRsvp as Rsvp];
+      });
+      setManualRsvp({
+        contact_name: "",
+        whatsapp: "",
+        attendees: [{ name: "", category: "adult", age: "" }],
+      });
+      const addedCount = Number(result.addedCount ?? attendees.length);
+      setManualRsvpMessage(
+        addedCount === 1
+          ? "1 convidado adicionado com sucesso."
+          : `${addedCount} convidados adicionados com sucesso.`,
+      );
+    } catch (error) {
+      setManualRsvpMessage(error instanceof Error ? error.message : "Não foi possível adicionar os convidados.");
+    } finally {
+      setRsvpBusy(false);
+    }
+  }
+
   function startRsvpEdit(rsvp: Rsvp) {
     setEditingRsvpId(rsvp.id);
     setRsvpDraft({
@@ -470,6 +584,7 @@ export function InvitationEditor({
     const attendees = rsvpDraft.attendees.map((item) => ({
       name: item.name.trim().replace(/\s+/g, " "),
       category: item.category,
+      ...(item.category === "child" && item.age !== null && item.age !== undefined ? { age: item.age } : {}),
     }));
 
     if (contactName.length < 2) {
@@ -849,6 +964,135 @@ export function InvitationEditor({
                   </button>
                 </div>
               </div>
+              <details className="mt-5 rounded-2xl border border-[#e1d3cb] bg-[#faf6f3] p-4 sm:p-5">
+                <summary className="flex cursor-pointer list-none items-center gap-2 font-display text-lg font-bold text-[#351820]">
+                  <span className="grid size-8 place-items-center rounded-full bg-[#7d1f37] text-white"><Plus className="size-4" /></span>
+                  Adicionar convidados manualmente
+                </summary>
+                <p className="mt-2 text-sm leading-6 text-[#806e72]">
+                  Use esta opção quando o organizador quiser incluir uma pessoa ou família diretamente na lista. O WhatsApp é opcional.
+                </p>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <Field label="Responsável pelo grupo (opcional)">
+                    <Input
+                      value={manualRsvp.contact_name}
+                      onChange={(value) => setManualRsvp((current) => ({ ...current, contact_name: value }))}
+                      placeholder="Se vazio, será usado o primeiro convidado"
+                    />
+                  </Field>
+                  <Field label="WhatsApp (opcional)">
+                    <Input
+                      value={manualRsvp.whatsapp}
+                      onChange={(value) => setManualRsvp((current) => ({ ...current, whatsapp: value }))}
+                      placeholder="(67) 99999-9999"
+                    />
+                  </Field>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {manualRsvp.attendees.map((attendee, index) => (
+                    <div key={index} className="rounded-2xl border border-[#e4d8d0] bg-white p-3">
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+                        <Field label={`Convidado ${index + 1}`}>
+                          <Input
+                            value={attendee.name}
+                            onChange={(value) => setManualRsvp((current) => ({
+                              ...current,
+                              attendees: current.attendees.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, name: value } : item,
+                              ),
+                            }))}
+                            placeholder="Nome completo"
+                          />
+                        </Field>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setManualRsvp((current) => ({
+                              ...current,
+                              attendees: current.attendees.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, category: "adult", age: "" } : item,
+                              ),
+                            }))}
+                            className={`h-10 rounded-full px-3 text-xs font-bold ${attendee.category === "adult" ? "bg-[#7d1f37] text-white" : "border border-[#d8c7bd] bg-white text-[#684f55]"}`}
+                          >
+                            Adulto
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setManualRsvp((current) => ({
+                              ...current,
+                              attendees: current.attendees.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, category: "child" } : item,
+                              ),
+                            }))}
+                            className={`h-10 rounded-full px-3 text-xs font-bold ${attendee.category === "child" ? "bg-[#7d1f37] text-white" : "border border-[#d8c7bd] bg-white text-[#684f55]"}`}
+                          >
+                            Criança
+                          </button>
+                        </div>
+                        {manualRsvp.attendees.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setManualRsvp((current) => ({
+                              ...current,
+                              attendees: current.attendees.filter((_, itemIndex) => itemIndex !== index),
+                            }))}
+                            className="inline-flex h-10 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold text-red-700"
+                          >
+                            <Trash2 className="size-3.5" /> Remover
+                          </button>
+                        )}
+                      </div>
+                      {attendee.category === "child" && (
+                        <label className="mt-3 block max-w-[160px] text-sm font-bold text-[#594147]">
+                          Idade da criança
+                          <input
+                            type="number"
+                            min={0}
+                            max={17}
+                            inputMode="numeric"
+                            value={attendee.age}
+                            onChange={(event) => setManualRsvp((current) => ({
+                              ...current,
+                              attendees: current.attendees.map((item, itemIndex) =>
+                                itemIndex === index ? { ...item, age: event.target.value } : item,
+                              ),
+                            }))}
+                            className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] bg-white px-3 text-sm outline-none focus:border-[#9e6172]"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={rsvpBusy || manualRsvp.attendees.length >= 20}
+                    onClick={() => setManualRsvp((current) => ({
+                      ...current,
+                      attendees: [...current.attendees, { name: "", category: "adult", age: "" }],
+                    }))}
+                    className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-4 text-sm font-bold text-[#684f55] disabled:opacity-50"
+                  >
+                    <Plus className="size-4" /> Adicionar pessoa
+                  </button>
+                  <button
+                    type="button"
+                    disabled={rsvpBusy}
+                    onClick={() => void addManualRsvp()}
+                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {rsvpBusy ? <Loader2 className="size-4 animate-spin" /> : <UsersRound className="size-4" />}
+                    {rsvpBusy ? "Salvando..." : "Salvar convidados"}
+                  </button>
+                </div>
+                {manualRsvpMessage && <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm font-bold text-[#684f55]">{manualRsvpMessage}</p>}
+              </details>
+
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Stat label="Confirmações" value={rsvps.length} /><Stat label="Convidados" value={totalGuests} /><Stat label="Adultos" value={adults} /><Stat label="Crianças" value={children} /></div>
               <h3 className="mt-7 font-display text-xl font-bold">Presenças</h3>
               <div className="mt-3 space-y-3">
