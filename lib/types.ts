@@ -37,6 +37,7 @@ export type Invitation = {
   hero_image_x: number;
   hero_image_y: number;
   gift_enabled: boolean;
+  gift_intro_text: string;
   gift_profile: GiftProfileItem[];
   rsvp_enabled: boolean;
   pix_gift_enabled: boolean;
