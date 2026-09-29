@@ -22,6 +22,33 @@ import type { Invitation, Rsvp } from "@/lib/types";
 
 type Attendee = Rsvp["attendees"][number];
 
+const SHARE_TEXT =
+  "Estou usando o Convidata para organizar um momento especial e gostei da praticidade! ✨ Com ele, posso criar convites digitais personalizados, acompanhar as confirmações de presença e organizar a lista de presentes em um só lugar. Conheça também:";
+
+async function shareConvidata() {
+  const url = `${window.location.origin}/?via=indicacao-convidata-3`;
+
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share({
+        title: "Convidata — convites que aproximam",
+        text: SHARE_TEXT,
+        url,
+      });
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  }
+
+  const whatsappText = `${SHARE_TEXT}\n\n${url}`;
+  window.open(
+    `https://wa.me/?text=${encodeURIComponent(whatsappText)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
+
 type DuplicateInfo = {
   submittedName: string;
   existingName: string;
@@ -108,6 +135,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
   const [message, setMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
+  const [viewerLoggedIn, setViewerLoggedIn] = useState(false);
 
   const [showDecline, setShowDecline] = useState(false);
   const [declineName, setDeclineName] = useState("");
@@ -128,6 +156,23 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
   const [pixData, setPixData] = useState<PixGiftData | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
   const [pixApproved, setPixApproved] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (active) setViewerLoggedIn(Boolean(data.user));
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active) setViewerLoggedIn(Boolean(session?.user));
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   useEffect(() => {
     let active = true;
@@ -491,9 +536,19 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
             <h3 className="mt-4 font-display text-3xl font-bold">Presença confirmada!</h3>
             <p className="mt-2 text-sm leading-6 text-[#806e72]">{addedCount === 1 ? "1 pessoa foi adicionada à lista." : `${addedCount} pessoas foram adicionadas à lista.`} Se este responsável já tinha uma confirmação anterior, os nomes já existentes não foram duplicados.</p>
             <div className="mt-6 rounded-2xl bg-[#fff6f1] p-5 text-left">
-              <p className="font-bold text-[#5d313e]">Gostou da Convidata?</p>
-              <p className="mt-1 text-sm leading-6 text-[#76666a]">Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.</p>
-              <a href="/entrar?modo=cadastro&origem=confirmacao" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#7d1f37] px-5 font-bold text-white">Criar minha conta</a>
+              {viewerLoggedIn ? (
+                <>
+                  <p className="font-bold text-[#5d313e]">Está gostando da Convidata? Indique para alguém.</p>
+                  <p className="mt-1 text-sm leading-6 text-[#76666a]">Compartilhe com alguém que também queira criar convites e organizar confirmações de forma prática.</p>
+                  <button type="button" onClick={() => void shareConvidata()} className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#7d1f37] px-5 font-bold text-white">Compartilhar Convidata</button>
+                </>
+              ) : (
+                <>
+                  <p className="font-bold text-[#5d313e]">Gostou da Convidata?</p>
+                  <p className="mt-1 text-sm leading-6 text-[#76666a]">Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.</p>
+                  <a href="/entrar?modo=cadastro&origem=confirmacao" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#7d1f37] px-5 font-bold text-white">Criar minha conta</a>
+                </>
+              )}
             </div>
           </div>
         </Modal>
