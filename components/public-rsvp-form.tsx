@@ -322,6 +322,8 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
       setContactCategory("adult");
       setContactAge(null);
       setAttendees([emptyAttendee()]);
+      const { data: currentAuth } = await supabase.auth.getUser();
+      setViewerLoggedIn(Boolean(currentAuth.user));
       setShowSuccess(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível confirmar a presença.");
