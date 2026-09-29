@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 const NAME_GUIDANCE =
   "Digite somente o nome de uma pessoa por campo, usando apenas letras e espaços. Ex.: Maria da Silva. Não use números, vírgulas, símbolos ou quantidades como “3 adultos”. Para incluir outra pessoa, use o botão + Adicionar pessoa.";
-
-const SHARE_TEXT =
-  "Estou usando o Convidata para organizar um momento especial e gostei da praticidade! ✨ Com ele, posso criar convites digitais personalizados, acompanhar as confirmações de presença e organizar a lista de presentes em um só lugar. Conheça também:";
 
 const GENERIC_NAMES = new Set([
   "adulto",
@@ -83,127 +79,11 @@ function clearNameGuidance(input: HTMLInputElement) {
   input.removeAttribute("aria-invalid");
 }
 
-async function shareConvidata() {
-  const url = `${window.location.origin}/?via=indicacao-convidata-3`;
-
-  if (typeof navigator.share === "function") {
-    try {
-      await navigator.share({
-        title: "Convidata — convites que aproximam",
-        text: SHARE_TEXT,
-        url,
-      });
-      return;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-    }
-  }
-
-  const whatsappText = `${SHARE_TEXT}\n\n${url}`;
-  window.open(
-    `https://wa.me/?text=${encodeURIComponent(whatsappText)}`,
-    "_blank",
-    "noopener,noreferrer",
-  );
-}
-
 export function RsvpFormGuard() {
   useEffect(() => {
-    const supabase = createClient();
     let cleanupCurrent: (() => void) | null = null;
     let observer: MutationObserver | null = null;
-    let successObserver: MutationObserver | null = null;
-    let loggedIn = false;
 
-    function updateSuccessOffer() {
-      const heading = Array.from(document.querySelectorAll("h3")).find(
-        (item) => item.textContent?.trim() === "Presença confirmada!",
-      );
-      if (!(heading instanceof HTMLElement)) return;
-
-      const modal = heading.closest("div.fixed");
-      if (!(modal instanceof HTMLElement)) return;
-
-      const promoTitle = Array.from(modal.querySelectorAll("p")).find((item) => {
-        const text = item.textContent?.trim();
-        return (
-          text === "Gostou da Convidata?" ||
-          text === "Está gostando da Convidata? Indique para alguém."
-        );
-      });
-      if (!(promoTitle instanceof HTMLParagraphElement)) return;
-
-      const promo = promoTitle.parentElement;
-      if (!(promo instanceof HTMLElement)) return;
-
-      const paragraphs = Array.from(promo.querySelectorAll("p"));
-      const description = paragraphs.find((item) => item !== promoTitle);
-      const accountLink = promo.querySelector<HTMLAnchorElement>(
-        'a[href*="/entrar?modo=cadastro"]',
-      );
-      const shareButton = promo.querySelector<HTMLButtonElement>(
-        'button[data-convidata-share="true"]',
-      );
-
-      if (!loggedIn) {
-        const signedOutTitle = "Gostou da Convidata?";
-        const signedOutDescription =
-          "Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.";
-
-        if (promoTitle.textContent?.trim() !== signedOutTitle) {
-          promoTitle.textContent = signedOutTitle;
-        }
-        if (description?.textContent?.trim() !== signedOutDescription) {
-          description.textContent = signedOutDescription;
-        }
-
-        if (shareButton) {
-          const signupLink = document.createElement("a");
-          signupLink.href = "/entrar?modo=cadastro&origem=confirmacao";
-          signupLink.className = shareButton.className;
-          signupLink.textContent = "Criar minha conta";
-          shareButton.replaceWith(signupLink);
-        } else if (accountLink) {
-          accountLink.href = "/entrar?modo=cadastro&origem=confirmacao";
-          accountLink.textContent = "Criar minha conta";
-        }
-        return;
-      }
-
-      const signedInTitle = "Está gostando da Convidata? Indique para alguém.";
-      const signedInDescription =
-        "Compartilhe com alguém que também queira criar convites e organizar confirmações de forma prática.";
-
-      if (promoTitle.textContent?.trim() !== signedInTitle) {
-        promoTitle.textContent = signedInTitle;
-      }
-      if (description?.textContent?.trim() !== signedInDescription) {
-        description.textContent = signedInDescription;
-      }
-
-      if (shareButton || !accountLink) return;
-
-      const nextShareButton = document.createElement("button");
-      nextShareButton.type = "button";
-      nextShareButton.className = accountLink.className;
-      nextShareButton.textContent = "Compartilhar Convidata";
-      nextShareButton.dataset.convidataShare = "true";
-      nextShareButton.addEventListener("click", () => void shareConvidata());
-      accountLink.replaceWith(nextShareButton);
-    }
-
-    void supabase.auth.getUser().then(({ data }) => {
-      loggedIn = Boolean(data.user);
-      updateSuccessOffer();
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      loggedIn = Boolean(session?.user);
-      updateSuccessOffer();
-    });
-
-    successObserver = new MutationObserver(() => updateSuccessOffer());
-    successObserver.observe(document.body, { childList: true, subtree: true });
 
     function attach() {
       const heading = Array.from(document.querySelectorAll("h2")).find((item) =>
@@ -347,9 +227,7 @@ export function RsvpFormGuard() {
 
     return () => {
       observer?.disconnect();
-      successObserver?.disconnect();
       cleanupCurrent?.();
-      authListener.subscription.unsubscribe();
     };
   }, []);
 
