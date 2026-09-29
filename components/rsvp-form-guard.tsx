@@ -116,8 +116,6 @@ export function RsvpFormGuard() {
     let loggedIn = false;
 
     function updateSuccessOffer() {
-      if (!loggedIn) return;
-
       const heading = Array.from(document.querySelectorAll("h3")).find(
         (item) => item.textContent?.trim() === "Presença confirmada!",
       );
@@ -126,39 +124,66 @@ export function RsvpFormGuard() {
       const modal = heading.closest("div.fixed");
       if (!(modal instanceof HTMLElement)) return;
 
-      const promoTitle = Array.from(modal.querySelectorAll("p")).find(
-        (item) => item.textContent?.trim() === "Gostou da Convidata?",
-      );
+      const promoTitle = Array.from(modal.querySelectorAll("p")).find((item) => {
+        const text = item.textContent?.trim();
+        return (
+          text === "Gostou da Convidata?" ||
+          text === "Está gostando da Convidata? Indique para alguém."
+        );
+      });
       if (!(promoTitle instanceof HTMLParagraphElement)) return;
 
       const promo = promoTitle.parentElement;
       if (!(promo instanceof HTMLElement)) return;
 
-      promoTitle.textContent = "Está gostando da Convidata? Indique para alguém.";
-
       const paragraphs = Array.from(promo.querySelectorAll("p"));
       const description = paragraphs.find((item) => item !== promoTitle);
+      const accountLink = promo.querySelector<HTMLAnchorElement>(
+        'a[href*="/entrar?modo=cadastro"]',
+      );
+      const shareButton = promo.querySelector<HTMLButtonElement>(
+        'button[data-convidata-share="true"]',
+      );
+
+      if (!loggedIn) {
+        promoTitle.textContent = "Gostou da Convidata?";
+        if (description) {
+          description.textContent =
+            "Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.";
+        }
+
+        if (shareButton) {
+          const signupLink = document.createElement("a");
+          signupLink.href = "/entrar?modo=cadastro&origem=confirmacao";
+          signupLink.className = shareButton.className;
+          signupLink.textContent = "Criar minha conta";
+          shareButton.replaceWith(signupLink);
+        } else if (accountLink) {
+          accountLink.href = "/entrar?modo=cadastro&origem=confirmacao";
+          accountLink.textContent = "Criar minha conta";
+        }
+        return;
+      }
+
+      promoTitle.textContent = "Está gostando da Convidata? Indique para alguém.";
       if (description) {
         description.textContent =
           "Compartilhe com alguém que também queira criar convites e organizar confirmações de forma prática.";
       }
 
-      const accountLink = promo.querySelector<HTMLAnchorElement>(
-        'a[href*="/entrar?modo=cadastro"]',
-      );
-      if (!accountLink) return;
+      if (shareButton || !accountLink) return;
 
-      const shareButton = document.createElement("button");
-      shareButton.type = "button";
-      shareButton.className = accountLink.className;
-      shareButton.textContent = "Compartilhar Convidata";
-      shareButton.dataset.convidataShare = "true";
-      shareButton.addEventListener("click", () => void shareConvidata());
-      accountLink.replaceWith(shareButton);
+      const nextShareButton = document.createElement("button");
+      nextShareButton.type = "button";
+      nextShareButton.className = accountLink.className;
+      nextShareButton.textContent = "Compartilhar Convidata";
+      nextShareButton.dataset.convidataShare = "true";
+      nextShareButton.addEventListener("click", () => void shareConvidata());
+      accountLink.replaceWith(nextShareButton);
     }
 
-    void supabase.auth.getSession().then(({ data }) => {
-      loggedIn = Boolean(data.session?.user);
+    void supabase.auth.getUser().then(({ data }) => {
+      loggedIn = Boolean(data.user);
       updateSuccessOffer();
     });
 
