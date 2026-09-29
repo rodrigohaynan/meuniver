@@ -6,8 +6,17 @@ import { createClient } from "@/lib/supabase/client";
 export function LogoutButton() {
   async function logout() {
     const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = "/";
+
+    try {
+      await fetch("/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+    } finally {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      window.location.replace("/");
+    }
   }
 
   return (
