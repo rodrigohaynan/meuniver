@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleDollarSign, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_GIFT_INTRO_TEXT } from "@/lib/gift-copy";
 import { TEMPLATES } from "@/lib/themes";
 import { EVENT_TYPES, eventTypeMeta, eventUsesAge, defaultEventTitle, defaultInvitationText, type EventType } from "@/lib/event-types";
 import type { GiftProfileItem } from "@/lib/types";
@@ -118,6 +119,7 @@ export function NewInvitationForm({
           theme_key: template.theme,
           layout_key: template.layout,
           gift_enabled: true,
+          gift_intro_text: DEFAULT_GIFT_INTRO_TEXT,
           gift_profile: buildGiftProfile(giftForm),
           rsvp_enabled: true,
         })
