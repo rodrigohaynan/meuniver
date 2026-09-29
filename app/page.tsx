@@ -2,16 +2,21 @@ import Link from "next/link";
 import { ArrowRight, Gift, Palette, PartyPopper, Smartphone, UsersRound } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { EventHero } from "@/components/event-hero";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8f4f1]">
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 sm:px-8 sm:py-4">
         <Link href="/" className="flex items-center">
           <BrandMark />
         </Link>
-        <Link href="/entrar" className="rounded-full border border-[#d8c5b8] bg-white px-5 py-2.5 text-sm font-bold text-[#5a3740] shadow-sm transition hover:border-[#aa7280]">
-          Entrar
+        <Link href={user ? "/painel" : "/entrar"} className="rounded-full border border-[#d8c5b8] bg-white px-5 py-2.5 text-sm font-bold text-[#5a3740] shadow-sm transition hover:border-[#aa7280]">
+          {user ? "Meu painel" : "Entrar"}
         </Link>
       </header>
 
@@ -27,8 +32,8 @@ export default function HomePage() {
             Personalize cores, fotos e mensagens, organize presentes e confirmações de presença. Compartilhe um único link com seus convidados.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/entrar?modo=cadastro" className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-6 font-bold text-white shadow-lg shadow-[#7d1f37]/15 transition hover:bg-[#64172b]">
-              Criar meu convite <ArrowRight className="size-4" />
+            <Link href={user ? "/painel" : "/entrar?modo=cadastro"} className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-6 font-bold text-white shadow-lg shadow-[#7d1f37]/15 transition hover:bg-[#64172b]">
+              {user ? "Ir para meu painel" : "Criar meu convite"} <ArrowRight className="size-4" />
             </Link>
             <a href="#recursos" className="inline-flex h-11 items-center rounded-full border border-[#d8c5b8] bg-white px-6 font-bold text-[#5a3740]">
               Ver recursos
@@ -79,8 +84,8 @@ export default function HomePage() {
         <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-[#725f63] sm:text-lg">
           Escolha um estilo, personalize os detalhes e compartilhe a sua data especial com quem você ama.
         </p>
-        <Link href="/entrar?modo=cadastro" className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-7 font-bold text-white">
-          Criar conta grátis <ArrowRight className="size-4" />
+        <Link href={user ? "/painel" : "/entrar?modo=cadastro"} className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-7 font-bold text-white">
+          {user ? "Acessar meu painel" : "Criar conta grátis"} <ArrowRight className="size-4" />
         </Link>
       </section>
     </main>
