@@ -26,6 +26,7 @@ create table if not exists public.invitations (
   hero_image_x integer not null default 50,
   hero_image_y integer not null default 50,
   gift_enabled boolean not null default true,
+  gift_intro_text text not null default 'A presença é o mais importante. Sugestões genéricas podem ser escolhidas por mais de uma pessoa; presentes específicos ficam indisponíveis depois da primeira escolha.',
   rsvp_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
