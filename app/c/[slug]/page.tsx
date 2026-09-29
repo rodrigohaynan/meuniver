@@ -253,6 +253,7 @@ export default async function PublicInvitationPage({ params }: PageProps) {
         hostName={invitation.host_name}
         themeKey={invitation.theme_key}
         giftEnabled={invitation.gift_enabled}
+        giftIntroText={invitation.gift_intro_text}
         giftProfile={invitation.gift_profile ?? []}
         gifts={gifts}
       />
