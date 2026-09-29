@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { CheckCircle2, ExternalLink, Gift, Loader2, Ruler, Search, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
+import { DEFAULT_GIFT_INTRO_TEXT } from "@/lib/gift-copy";
 import type { GiftItem, GiftProfileItem } from "@/lib/types";
 
 function shopeeSearch(name: string) {
@@ -18,12 +19,14 @@ export function PublicGiftExtras({
   hostName,
   themeKey,
   giftEnabled,
+  giftIntroText,
   giftProfile,
   gifts,
 }: {
   hostName: string;
   themeKey: string;
   giftEnabled: boolean;
+  giftIntroText?: string | null;
   giftProfile: GiftProfileItem[];
   gifts: GiftItem[];
 }) {
@@ -145,8 +148,8 @@ export function PublicGiftExtras({
                 Se quiser presentear
               </p>
               <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl">Sugestões de presentes</h2>
-              <p style={{ color: theme.colors.muted }} className="mx-auto mt-2 max-w-2xl text-sm leading-6">
-                A presença é o mais importante. Sugestões genéricas podem ser escolhidas por mais de uma pessoa; presentes específicos ficam indisponíveis depois da primeira escolha.
+              <p style={{ color: theme.colors.muted }} className="mx-auto mt-2 max-w-2xl whitespace-pre-line text-sm leading-6">
+                {giftIntroText?.trim() || DEFAULT_GIFT_INTRO_TEXT}
               </p>
             </div>
 
