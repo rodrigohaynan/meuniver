@@ -146,10 +146,15 @@ export function RsvpFormGuard() {
       );
 
       if (!loggedIn) {
-        promoTitle.textContent = "Gostou da Convidata?";
-        if (description) {
-          description.textContent =
-            "Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.";
+        const signedOutTitle = "Gostou da Convidata?";
+        const signedOutDescription =
+          "Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.";
+
+        if (promoTitle.textContent?.trim() !== signedOutTitle) {
+          promoTitle.textContent = signedOutTitle;
+        }
+        if (description?.textContent?.trim() !== signedOutDescription) {
+          description.textContent = signedOutDescription;
         }
 
         if (shareButton) {
@@ -165,10 +170,15 @@ export function RsvpFormGuard() {
         return;
       }
 
-      promoTitle.textContent = "Está gostando da Convidata? Indique para alguém.";
-      if (description) {
-        description.textContent =
-          "Compartilhe com alguém que também queira criar convites e organizar confirmações de forma prática.";
+      const signedInTitle = "Está gostando da Convidata? Indique para alguém.";
+      const signedInDescription =
+        "Compartilhe com alguém que também queira criar convites e organizar confirmações de forma prática.";
+
+      if (promoTitle.textContent?.trim() !== signedInTitle) {
+        promoTitle.textContent = signedInTitle;
+      }
+      if (description?.textContent?.trim() !== signedInDescription) {
+        description.textContent = signedInDescription;
       }
 
       if (shareButton || !accountLink) return;
