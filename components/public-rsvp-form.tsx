@@ -547,7 +547,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
               ) : (
                 <>
                   <p className="font-bold text-[#5d313e]">Gostou da Convidata?</p>
-                  <p className="mt-1 text-sm leading-6 text-[#76666a]">Crie sua conta gratuitamente e deixe tudo pronto para criar e gerenciar seus próprios convites.</p>
+                  <p className="mt-1 text-sm leading-6 text-[#76666a]">Que tal criar o seu também? Cadastre-se gratuitamente e tenha tudo em um só lugar para criar convites especiais, acompanhar confirmações e organizar cada detalhe.</p>
                   <a href="/entrar?modo=cadastro&origem=confirmacao" className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-[#7d1f37] px-5 font-bold text-white">Criar minha conta</a>
                 </>
               )}
