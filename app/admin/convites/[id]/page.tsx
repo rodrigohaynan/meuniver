@@ -104,6 +104,7 @@ export default async function AdminInvitationDetailsPage({ params, searchParams 
           <Field label="Observações para confirmação" value={invitation.rsvp_note} />
           <Field label="Confirmação de presença" value={invitation.rsvp_enabled ? "Ativada" : "Desativada"} />
           <Field label="Lista de presentes" value={invitation.gift_enabled ? "Ativada" : "Desativada"} />
+          <Field label="Mensagem da seção de presentes" value={invitation.gift_intro_text} />
           <Field label="Criado em" value={new Date(invitation.created_at).toLocaleString("pt-BR")} />
           <Field label="Atualizado em" value={new Date(invitation.updated_at).toLocaleString("pt-BR")} />
           <Field label="Endereço interno" value={`/c/${invitation.slug}`} />
