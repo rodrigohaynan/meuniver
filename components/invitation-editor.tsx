@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme, LAYOUTS, THEMES } from "@/lib/themes";
+import { DEFAULT_GIFT_INTRO_TEXT } from "@/lib/gift-copy";
 import { EVENT_TYPES, eventTypeFor, eventTypeMeta, eventUsesAge, defaultEventTitle, defaultInvitationText, type EventType } from "@/lib/event-types";
 import type { GiftItem, GiftReservation, GiftReservationMode, Invitation, Rsvp } from "@/lib/types";
 import { exportAttendancePdf, exportAttendanceXlsx } from "@/lib/attendance-export";
@@ -92,6 +93,7 @@ export function InvitationEditor({
     hero_image_x: initialInvitation.hero_image_x ?? 50,
     hero_image_y: initialInvitation.hero_image_y ?? 50,
     age_unit: initialInvitation.age_unit ?? (eventUsesAge(eventTypeFor(initialInvitation)) ? "years" : null),
+    gift_intro_text: initialInvitation.gift_intro_text?.trim() || DEFAULT_GIFT_INTRO_TEXT,
   });
   const [gifts, setGifts] = useState(initialGifts.map((gift) => ({ ...gift, suggestion_image_url: gift.suggestion_image_url ?? null })));
   const [rsvps, setRsvps] = useState(initialRsvps);
@@ -153,6 +155,7 @@ export function InvitationEditor({
           hero_image_x: invitation.hero_image_x,
           hero_image_y: invitation.hero_image_y,
           gift_enabled: invitation.gift_enabled,
+          gift_intro_text: invitation.gift_intro_text.trim() || DEFAULT_GIFT_INTRO_TEXT,
           rsvp_enabled: invitation.rsvp_enabled,
         })
         .eq("id", invitation.id)
@@ -885,6 +888,44 @@ export function InvitationEditor({
           {tab === "gifts" && (
             <div>
               <SectionTitle title="Lista de presentes" description="Foto manual tem prioridade. Sem foto manual, o sistema salva uma cópia da imagem do link para evitar anúncios quebrados." />
+
+              <div className="mt-5 rounded-2xl border border-[#e3d6cf] bg-white p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-display text-lg font-bold text-[#351820]">Mensagem da seção de presentes</h3>
+                    <p className="mt-1 text-xs leading-5 text-[#806e72]">
+                      Este texto aparece logo abaixo de “Sugestões de presentes” para os convidados.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInvitation((current) => ({ ...current, gift_intro_text: DEFAULT_GIFT_INTRO_TEXT }))}
+                    className="rounded-full border border-[#d8c7bd] bg-white px-3 py-2 text-xs font-bold text-[#684f55]"
+                  >
+                    Restaurar padrão
+                  </button>
+                </div>
+                <textarea
+                  value={invitation.gift_intro_text}
+                  onChange={(event) => setInvitation((current) => ({ ...current, gift_intro_text: event.target.value.slice(0, 600) }))}
+                  maxLength={600}
+                  rows={4}
+                  className="mt-4 w-full rounded-xl border border-[#d8c7bd] bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-[#9e6172] focus:ring-2 focus:ring-[#9e6172]/10"
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-[#907d82]">{invitation.gift_intro_text.length}/600 caracteres</span>
+                  <button
+                    type="button"
+                    disabled={saving || !invitation.gift_intro_text.trim()}
+                    onClick={() => void saveInvitation()}
+                    className="inline-flex h-9 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                    Salvar mensagem
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-5 grid gap-3 rounded-2xl bg-[#faf6f3] p-4 sm:grid-cols-2">
                 <Field label="Nome"><Input value={newGift.name} onChange={(value) => setNewGift({ ...newGift, name: value })} placeholder="Ex.: Mochila média" /></Field>
                 <Field label="Observação"><Input value={newGift.price_hint} onChange={(value) => setNewGift({ ...newGift, price_hint: value })} placeholder="Cor, tamanho..." /></Field>
