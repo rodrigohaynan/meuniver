@@ -539,39 +539,94 @@ function createPdf(payload: AttendanceExportPayload) {
     pageStreams.push(stream);
   }
 
-  for (const group of grouped) {
-    const rowsPerGroupPage = 40;
-    const pages = Math.max(1, Math.ceil(group.rows.length / rowsPerGroupPage));
-    for (let pageIndex = 0; pageIndex < pages; pageIndex += 1) {
-      const pageRows = group.rows.slice(pageIndex * rowsPerGroupPage, pageIndex * rowsPerGroupPage + rowsPerGroupPage);
-      let stream = "";
+  const childGroups = grouped.filter((group) => group.rows.length > 0);
+
+  if (childGroups.length > 0) {
+    const agePageStreams: string[] = [];
+    const topY = 744;
+    const bottomY = 54;
+    const rowHeight = 16;
+    const sectionTitleHeight = 24;
+    const tableHeaderHeight = 28;
+
+    let stream = "";
+    let cursorY = topY;
+
+    function startAgePage() {
+      stream = "";
       stream += pdfText("Crianças por faixa etária", 34, 806, 16, true);
-      stream += pdfText(`${group.label} — ${group.rows.length} criança(s)`, 34, 782, 12, true);
-      stream += pdfText(truncate(payload.eventTitle, 70), 34, 764, 9);
-      stream += pdfText(`Página ${pageIndex + 1} de ${pages}`, 500, 806, 8);
-
-      stream += "0.75 w 34 744 m 560 744 l S\n";
-      stream += pdfText("Nº", 34, 728, 8, true);
-      stream += pdfText("Convidado", 70, 728, 8, true);
-      stream += pdfText("Idade", 300, 728, 8, true);
-      stream += pdfText("Responsável", 345, 728, 8, true);
-      stream += pdfText("WhatsApp", 475, 728, 8, true);
-      stream += "0.5 w 34 720 m 560 720 l S\n";
-
-      if (pageRows.length === 0) {
-        stream += pdfText("Nenhuma criança nesta faixa.", 34, 694, 10);
-      } else {
-        pageRows.forEach((row, index) => {
-          const y = 702 - index * 16;
-          stream += pdfText(String(row.number), 34, y, 8.5);
-          stream += pdfText(truncate(row.name, 35), 70, y, 8.5);
-          stream += pdfText(row.age === null ? "—" : String(row.age), 300, y, 8.5);
-          stream += pdfText(truncate(row.contactName, 20), 345, y, 8.5);
-          stream += pdfText(truncate(row.whatsapp, 18), 475, y, 8.5);
-        });
-      }
-      pageStreams.push(stream);
+      stream += pdfText(truncate(payload.eventTitle, 70), 34, 784, 9);
+      stream += "0.75 w 34 766 m 560 766 l S\n";
+      cursorY = topY;
     }
+
+    function finishAgePage() {
+      if (stream) agePageStreams.push(stream);
+      stream = "";
+    }
+
+    function ensureAgeSpace(requiredHeight: number) {
+      if (!stream) startAgePage();
+      if (cursorY - requiredHeight < bottomY) {
+        finishAgePage();
+        startAgePage();
+      }
+    }
+
+    startAgePage();
+
+    for (const group of childGroups) {
+      let rowIndex = 0;
+      let continued = false;
+
+      while (rowIndex < group.rows.length) {
+        ensureAgeSpace(sectionTitleHeight + tableHeaderHeight + rowHeight);
+
+        const sectionLabel = continued
+          ? `${group.label} — continuação`
+          : `${group.label} — ${group.rows.length} criança(s)`;
+
+        stream += pdfText(sectionLabel, 34, cursorY, 11, true);
+        cursorY -= sectionTitleHeight;
+
+        stream += pdfText("Nº", 34, cursorY, 8, true);
+        stream += pdfText("Convidado", 70, cursorY, 8, true);
+        stream += pdfText("Idade", 300, cursorY, 8, true);
+        stream += pdfText("Responsável", 345, cursorY, 8, true);
+        stream += pdfText("WhatsApp", 475, cursorY, 8, true);
+        stream += `0.5 w 34 ${(cursorY - 8).toFixed(1)} m 560 ${(cursorY - 8).toFixed(1)} l S\n`;
+        cursorY -= tableHeaderHeight;
+
+        while (rowIndex < group.rows.length && cursorY >= bottomY) {
+          const row = group.rows[rowIndex];
+          stream += pdfText(String(row.number), 34, cursorY, 8.5);
+          stream += pdfText(truncate(row.name, 35), 70, cursorY, 8.5);
+          stream += pdfText(row.age === null ? "—" : String(row.age), 300, cursorY, 8.5);
+          stream += pdfText(truncate(row.contactName, 20), 345, cursorY, 8.5);
+          stream += pdfText(truncate(row.whatsapp, 18), 475, cursorY, 8.5);
+          cursorY -= rowHeight;
+          rowIndex += 1;
+        }
+
+        continued = rowIndex < group.rows.length;
+        cursorY -= continued ? 0 : 14;
+
+        if (continued) {
+          finishAgePage();
+          startAgePage();
+        }
+      }
+    }
+
+    finishAgePage();
+
+    const agePageCount = agePageStreams.length;
+    agePageStreams.forEach((ageStream, pageIndex) => {
+      pageStreams.push(
+        ageStream
+        + pdfText(`Página ${pageIndex + 1} de ${agePageCount}`, 500, 806, 8),
+      );
+    });
   }
 
   const objects: string[] = [];
