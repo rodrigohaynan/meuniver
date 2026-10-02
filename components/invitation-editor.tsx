@@ -579,6 +579,30 @@ export function InvitationEditor({
     );
   }
 
+  function addRsvpDraftAttendee() {
+    setRsvpDraft((current) =>
+      current
+        ? {
+            ...current,
+            attendees: [
+              ...current.attendees,
+              { name: "", category: "adult", age: null },
+            ],
+          }
+        : current,
+    );
+  }
+
+  function removeRsvpDraftAttendee(index: number) {
+    setRsvpDraft((current) => {
+      if (!current || current.attendees.length <= 1) return current;
+      return {
+        ...current,
+        attendees: current.attendees.filter((_, itemIndex) => itemIndex !== index),
+      };
+    });
+  }
+
   async function saveRsvpEdit(rsvpId: string) {
     if (!rsvpDraft || rsvpBusy) return;
 
@@ -596,6 +620,15 @@ export function InvitationEditor({
     }
     if (attendees.length < 1 || attendees.some((item) => item.name.length < 2)) {
       setMessage("A confirmação precisa ter pelo menos um convidado com nome válido.");
+      return;
+    }
+    if (
+      attendees.some((item) =>
+        item.category === "child"
+        && (!Number.isInteger(Number(item.age)) || Number(item.age) < 0 || Number(item.age) > 17),
+      )
+    ) {
+      setMessage("Informe a idade de cada criança, entre 0 e 17 anos.");
       return;
     }
 
@@ -1171,7 +1204,7 @@ export function InvitationEditor({
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => updateRsvpDraftAttendee(index, { category: "adult" })}
+                                  onClick={() => updateRsvpDraftAttendee(index, { category: "adult", age: null })}
                                   className={`h-9 rounded-full px-3 text-xs font-bold ${attendee.category === "adult" ? "bg-[#7d1f37] text-white" : "border border-[#d8c7bd] bg-white text-[#684f55]"}`}
                                 >
                                   Adulto
@@ -1185,17 +1218,42 @@ export function InvitationEditor({
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={rsvpBusy}
-                                  onClick={() => void removeRsvpAttendee(rsvp, index)}
-                                  className="inline-flex h-9 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold text-red-700 disabled:opacity-50"
+                                  disabled={rsvpBusy || rsvpDraft.attendees.length <= 1}
+                                  onClick={() => removeRsvpDraftAttendee(index)}
+                                  className="inline-flex h-9 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold text-red-700 disabled:opacity-40"
                                 >
                                   <Trash2 className="size-3.5" /> Excluir
                                 </button>
+                                {attendee.category === "child" && (
+                                  <label className="sm:col-span-4 flex flex-wrap items-center gap-2 text-xs font-bold text-[#806e72]">
+                                    Idade da criança
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={17}
+                                      value={attendee.age ?? ""}
+                                      onChange={(event) => updateRsvpDraftAttendee(index, {
+                                        age: event.target.value === "" ? null : Number(event.target.value),
+                                      })}
+                                      className="h-9 w-24 rounded-xl border border-[#d8c7bd] bg-white px-3 text-[#351820] outline-none focus:border-[#9e6172]"
+                                      required
+                                    />
+                                    <span className="font-normal">0 = menor de 1 ano</span>
+                                  </label>
+                                )}
                               </div>
                             ))}
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eee4de] pt-4">
+                            <button
+                              type="button"
+                              disabled={rsvpBusy || rsvpDraft.attendees.length >= 20}
+                              onClick={addRsvpDraftAttendee}
+                              className="inline-flex h-9 items-center gap-1 rounded-full border border-[#d8c7bd] bg-white px-3 text-xs font-bold text-[#684f55] disabled:opacity-50"
+                            >
+                              <Plus className="size-3.5" /> Adicionar pessoa à família
+                            </button>
                             <button
                               type="button"
                               disabled={rsvpBusy}
@@ -1236,6 +1294,24 @@ export function InvitationEditor({
                                 className="inline-flex h-9 items-center gap-1 rounded-full border border-[#d8c7bd] bg-white px-3 text-xs font-bold text-[#684f55]"
                               >
                                 <Pencil className="size-3.5" /> Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingRsvpId(rsvp.id);
+                                  setRsvpDraft({
+                                    contact_name: rsvp.contact_name,
+                                    whatsapp: rsvp.whatsapp,
+                                    attendees: [
+                                      ...rsvp.attendees.map((item) => ({ ...item })),
+                                      { name: "", category: "adult", age: null },
+                                    ],
+                                  });
+                                  setMessage("");
+                                }}
+                                className="inline-flex h-9 items-center gap-1 rounded-full border border-[#d8c7bd] bg-white px-3 text-xs font-bold text-[#684f55]"
+                              >
+                                <Plus className="size-3.5" /> Adicionar pessoa
                               </button>
                               <button
                                 type="button"
