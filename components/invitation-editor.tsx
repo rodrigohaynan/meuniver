@@ -9,7 +9,6 @@ import {
   Gift,
   ImagePlus,
   Loader2,
-  MessageCircle,
   Minus,
   MoveHorizontal,
   MoveVertical,
@@ -794,10 +793,9 @@ export function InvitationEditor({
                 <button
                   type="button"
                   onClick={shareInvitationOnWhatsapp}
-                  className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#cfe9d8] bg-[#eaf8ef] px-2.5 text-xs font-bold text-[#187a3f]"
+                  className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                   aria-label="Compartilhar convite no WhatsApp"
                 >
-                  <MessageCircle className="size-3.5" />
                   WhatsApp
                 </button>
               </>
