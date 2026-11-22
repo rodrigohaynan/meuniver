@@ -27,8 +27,8 @@ export async function GET() {
     }
 
     let auth:
-      | { ok: true; status: number }
-      | { ok: false; error: string; cause?: string };
+      | { ok: boolean; status: number }
+      | { ok: boolean; error: string; cause?: string };
 
     try {
       const response = await fetch(`${url}/auth/v1/health`, {
