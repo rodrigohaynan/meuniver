@@ -16,8 +16,13 @@ export async function POST(request: Request) {
 
     if (error) {
       return NextResponse.json(
-        { ok: false, error: "E-mail ou senha incorretos." },
-        { status: 400 },
+        {
+          ok: false,
+          error: /fetch failed|failed to fetch/i.test(error.message)
+            ? "O serviço de acesso está temporariamente indisponível. Tente novamente em alguns instantes."
+            : "E-mail ou senha incorretos.",
+        },
+        { status: /fetch failed|failed to fetch/i.test(error.message) ? 503 : 400 },
       );
     }
 
