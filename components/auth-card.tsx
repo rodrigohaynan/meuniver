@@ -52,7 +52,7 @@ function formatWhatsapp(value: string) {
 export function AuthCard() {
   const searchParams = useSearchParams();
   const origin = searchParams.get("origem");
-  const [mode, setMode] = useState<"login" | "signup">(
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">(
     searchParams.get("modo") === "cadastro" ? "signup" : "login",
   );
   const [email, setEmail] = useState("");
@@ -137,6 +137,13 @@ export function AuthCard() {
     if (busy) return;
     setMessage("");
 
+    if (mode === "forgot") {
+      if (!email.trim()) {
+        setMessage("Informe seu e-mail para recuperar a senha.");
+        return;
+      }
+    }
+
     if (mode === "signup") {
       if (fullName.trim().length < 3) {
         setMessage("Informe seu nome completo.");
@@ -155,6 +162,15 @@ export function AuthCard() {
     setBusy(true);
 
     try {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/auth/callback?next=/redefinir-senha`,
+        });
+        if (error) throw error;
+        setMessage("Enviamos um link para redefinir sua senha. Verifique sua caixa de entrada e também a pasta de spam.");
+        return;
+      }
+
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
@@ -211,7 +227,7 @@ export function AuthCard() {
         <button
           type="button"
           onClick={() => { setMode("login"); setMessage(""); }}
-          className={`h-9 rounded-full text-sm font-bold transition ${mode === "login" ? "bg-white text-[#6e2037] shadow-sm" : "text-[#806e72]"}`}
+          className={`h-9 rounded-full text-sm font-bold transition ${mode === "login" || mode === "forgot" ? "bg-white text-[#6e2037] shadow-sm" : "text-[#806e72]"}`}
         >
           Entrar
         </button>
@@ -225,22 +241,47 @@ export function AuthCard() {
       </div>
 
       <h1 className="mt-5 font-display text-2xl font-bold leading-[1.08] text-[#351820] sm:text-[28px]">
-        {mode === "login"
-          ? "Bem-vindo de volta"
-          : signupFromConfirmation
+        {mode === "forgot"
+          ? "Recupere sua senha"
+          : mode === "login"
+            ? "Bem-vindo de volta"
+            : signupFromConfirmation
             ? "Sua presença já está confirmada. Agora venha para a Convidata."
             : "Crie sua conta na Convidata"}
       </h1>
       <p className="mt-2 text-sm leading-6 text-[#7c686d]">
-        {mode === "login"
-          ? "Entre com seu e-mail e senha para acessar seus convites."
-          : signupFromConfirmation
+        {mode === "forgot"
+          ? "Informe o e-mail da sua conta e enviaremos um link seguro para você criar uma nova senha."
+          : mode === "login"
+            ? "Entre com seu e-mail e senha para acessar seus convites."
+            : signupFromConfirmation
             ? "Cadastre-se gratuitamente e tenha sua conta pronta para criar e gerenciar seus próprios convites."
             : "Cadastre seus dados para começar a organizar seus próprios convites."}
       </p>
 
       <form onSubmit={submitEmail} className="mt-5 space-y-3">
-        {mode === "signup" ? (
+        {mode === "forgot" ? (
+          <>
+            <Field label="E-mail" icon={<Mail className="size-4" />}>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                autoComplete="email"
+                className="min-w-0 flex-1 bg-transparent outline-none"
+                placeholder="voce@email.com"
+              />
+            </Field>
+            <button
+              type="button"
+              onClick={() => { setMode("login"); setMessage(""); }}
+              className="text-left text-sm font-bold text-[#7d1f37] hover:underline"
+            >
+              ← Voltar para entrar
+            </button>
+          </>
+        ) : mode === "signup" ? (
           <>
             <Field label="Nome completo" icon={<UserRound className="size-4" />}>
               <input
@@ -394,6 +435,16 @@ export function AuthCard() {
               />
             </Field>
 
+            <div className="-mt-1 text-right">
+              <button
+                type="button"
+                onClick={() => { setMode("forgot"); setMessage(""); setPassword(""); }}
+                className="text-sm font-bold text-[#7d1f37] hover:underline"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
+
             <label className="flex cursor-pointer items-center gap-2 pt-1 text-sm text-[#684f55]">
               <input
                 type="checkbox"
@@ -411,7 +462,7 @@ export function AuthCard() {
           className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f37] font-bold text-white transition hover:bg-[#64172b] disabled:opacity-60"
         >
           {busy && <Loader2 className="size-4 animate-spin" />}
-          {mode === "login" ? "Entrar no painel" : "Criar minha conta"}
+          {mode === "forgot" ? "Enviar link de recuperação" : mode === "login" ? "Entrar no painel" : "Criar minha conta"}
         </button>
       </form>
 
