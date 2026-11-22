@@ -160,7 +160,7 @@ export function InvitationEditor({
         })
         .eq("id", invitation.id)
         .eq("owner_id", user.id)
-        .select("status,billing_status")
+        .select("status,billing_status,updated_at")
         .maybeSingle();
 
       if (error) {
@@ -176,7 +176,7 @@ export function InvitationEditor({
         return;
       }
 
-      setInvitation((current) => ({ ...current, status: saved.status as Invitation["status"] }));
+      setInvitation((current) => ({ ...current, status: saved.status as Invitation["status"], updated_at: saved.updated_at ?? current.updated_at }));
       setMessage(
         nextStatus === "published"
           ? "Convite publicado com sucesso! Agora você já pode abrir e compartilhar o link."
@@ -742,12 +742,27 @@ export function InvitationEditor({
   }
 
   function shareInvitationOnWhatsapp() {
-    const invitationUrl = `${window.location.origin}/c/${invitation.slug}`;
+    const shareFingerprint = suggestionImageFingerprint([
+      invitation.event_title ?? "",
+      invitation.invitation_text ?? "",
+      invitation.hero_image_url ?? "",
+      invitation.hero_image_zoom ?? 1,
+      invitation.hero_image_x ?? 50,
+      invitation.hero_image_y ?? 50,
+      invitation.updated_at ?? "",
+    ].join("|"));
+
+    const invitationUrl = new URL(
+      `/c/${invitation.slug}`,
+      window.location.origin,
+    );
+    invitationUrl.searchParams.set("share", shareFingerprint);
+
     const title = invitation.event_title?.trim() || "meu evento";
     const text = [
       "Você está convidado(a)! 🎉",
       `Confira o convite de ${title} e confirme sua presença:`,
-      invitationUrl,
+      invitationUrl.toString(),
     ].join("\n\n");
 
     window.open(
