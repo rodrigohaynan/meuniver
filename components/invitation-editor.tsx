@@ -779,28 +779,28 @@ export function InvitationEditor({
             <p className="text-xs font-bold uppercase tracking-[.14em] text-[#9a7438]">Prévia do convite</p>
             <p className="mt-1 text-sm font-semibold text-[#765f65]">Edite abaixo e acompanhe o resultado sem um painel pesado.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-col items-start gap-2">
             <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${invitation.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-[#f5ece7] text-[#765f65]"}`}>{invitation.status === "published" ? "Publicado" : "Rascunho"}</span>
             {invitation.status === "published" && (
-              <>
+              <div className="grid w-full max-w-[430px] grid-cols-2 gap-2">
                 <a
                   href={`/c/${invitation.slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#e0cbd2] bg-white px-3.5 text-sm font-bold text-[#7d1f37] transition hover:bg-[#fff4f6]"
+                  className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[#e0cbd2] bg-white px-2 text-xs font-bold text-[#7d1f37] transition hover:bg-[#fff4f6] sm:px-3 sm:text-sm"
                 >
-                  Abrir convite <ExternalLink className="size-4" />
+                  Abrir convite <ExternalLink className="size-3.5 shrink-0 sm:size-4" />
                 </a>
                 <button
                   type="button"
                   onClick={shareInvitationOnWhatsapp}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#cfe9d8] bg-[#eaf8ef] px-3.5 text-sm font-bold text-[#187a3f] transition hover:bg-[#ddf3e5]"
+                  className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[#cfe9d8] bg-[#eaf8ef] px-2 text-xs font-bold text-[#187a3f] transition hover:bg-[#ddf3e5] sm:px-3 sm:text-sm"
                   aria-label="Compartilhar convite no WhatsApp"
                 >
-                  <MessageCircle className="size-4" />
+                  <MessageCircle className="size-3.5 shrink-0 sm:size-4" />
                   Compartilhar no WhatsApp
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
