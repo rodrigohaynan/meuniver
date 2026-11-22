@@ -779,28 +779,31 @@ export function InvitationEditor({
             <p className="text-xs font-bold uppercase tracking-[.14em] text-[#9a7438]">Prévia do convite</p>
             <p className="mt-1 text-sm font-semibold text-[#765f65]">Edite abaixo e acompanhe o resultado sem um painel pesado.</p>
           </div>
-          <div className="flex min-w-0 flex-col items-start gap-2">
-            <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${invitation.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-[#f5ece7] text-[#765f65]"}`}>{invitation.status === "published" ? "Publicado" : "Rascunho"}</span>
+          <div className="flex max-w-full flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
+            <span className={`inline-flex h-8 shrink-0 items-center rounded-full px-3 text-xs font-bold ${invitation.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-[#f5ece7] text-[#765f65]"}`}>
+              {invitation.status === "published" ? "Publicado" : "Rascunho"}
+            </span>
             {invitation.status === "published" && (
-              <div className="grid w-full max-w-[430px] grid-cols-2 gap-2">
+              <>
                 <a
                   href={`/c/${invitation.slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[#e0cbd2] bg-white px-2 text-xs font-bold text-[#7d1f37] transition hover:bg-[#fff4f6] sm:px-3 sm:text-sm"
+                  className="inline-flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-[#e0cbd2] bg-white px-2.5 text-xs font-bold text-[#7d1f37] transition hover:bg-[#fff4f6]"
                 >
-                  Abrir convite <ExternalLink className="size-3.5 shrink-0 sm:size-4" />
+                  Abrir convite <ExternalLink className="size-3.5 shrink-0" />
                 </a>
                 <button
                   type="button"
                   onClick={shareInvitationOnWhatsapp}
-                  className="inline-flex h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-[#cfe9d8] bg-[#eaf8ef] px-2 text-xs font-bold text-[#187a3f] transition hover:bg-[#ddf3e5] sm:px-3 sm:text-sm"
+                  className="inline-flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-[#cfe9d8] bg-[#eaf8ef] px-2.5 text-xs font-bold text-[#187a3f] transition hover:bg-[#ddf3e5]"
                   aria-label="Compartilhar convite no WhatsApp"
+                  title="Compartilhar no WhatsApp"
                 >
-                  <MessageCircle className="size-3.5 shrink-0 sm:size-4" />
-                  Compartilhar no WhatsApp
+                  <MessageCircle className="size-3.5 shrink-0" />
+                  <span className="hidden min-[350px]:inline">WhatsApp</span>
                 </button>
-              </div>
+              </>
             )}
           </div>
         </div>
