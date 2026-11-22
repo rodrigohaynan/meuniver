@@ -783,6 +783,14 @@ export function InvitationEditor({
             <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${invitation.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-[#f5ece7] text-[#765f65]"}`}>{invitation.status === "published" ? "Publicado" : "Rascunho"}</span>
             {invitation.status === "published" && (
               <>
+                <a
+                  href={`/c/${invitation.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#e0cbd2] bg-white px-3.5 text-sm font-bold text-[#7d1f37] transition hover:bg-[#fff4f6]"
+                >
+                  Abrir convite <ExternalLink className="size-4" />
+                </a>
                 <button
                   type="button"
                   onClick={shareInvitationOnWhatsapp}
@@ -792,14 +800,6 @@ export function InvitationEditor({
                   <MessageCircle className="size-4" />
                   Compartilhar no WhatsApp
                 </button>
-                <a
-                  href={`/c/${invitation.slug}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#e0cbd2] bg-white px-3.5 text-sm font-bold text-[#7d1f37] transition hover:bg-[#fff4f6]"
-                >
-                  Abrir convite <ExternalLink className="size-4" />
-                </a>
               </>
             )}
           </div>
