@@ -58,8 +58,21 @@ export default async function DashboardPage() {
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {invitations.map((invitation) => (
             <article key={invitation.id} className="overflow-hidden rounded-[1.7rem] border border-[#e1d3cb] bg-white shadow-sm">
-              <div className="h-36 bg-[#f3e8e2]" style={invitation.hero_image_url ? { backgroundImage: `url("${invitation.hero_image_url}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>
-                {!invitation.hero_image_url && <div className="grid h-full place-items-center text-4xl">{eventTypeMeta(eventTypeFor(invitation)).emoji}</div>}
+              <div className="relative h-36 overflow-hidden bg-[#f3e8e2]">
+                {invitation.hero_image_url ? (
+                  <img
+                    src={invitation.hero_image_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${Math.max(0, Math.min(100, invitation.hero_image_x ?? 50))}% ${Math.max(0, Math.min(100, invitation.hero_image_y ?? 50))}%`,
+                      transform: `scale(${Math.max(1, Math.min(2.5, invitation.hero_image_zoom ?? 1))})`,
+                      transformOrigin: "center",
+                    }}
+                  />
+                ) : (
+                  <div className="grid h-full place-items-center text-4xl">{eventTypeMeta(eventTypeFor(invitation)).emoji}</div>
+                )}
               </div>
               <div className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
