@@ -61,6 +61,7 @@ export async function GET(
 
   const x = Math.max(0, Math.min(100, invitation?.hero_image_x ?? 50));
   const y = Math.max(0, Math.min(100, invitation?.hero_image_y ?? 50));
+  const zoom = Math.max(1, Math.min(2.5, invitation?.hero_image_zoom ?? 1));
 
   /*
    * IMPORTANTE:
@@ -94,6 +95,8 @@ export async function GET(
             height: "100%",
             objectFit: "cover",
             objectPosition: `${x}% ${y}%`,
+            transform: `scale(${zoom})`,
+            transformOrigin: "center",
           },
         })
       : createElement("div", {
