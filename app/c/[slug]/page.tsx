@@ -100,6 +100,15 @@ function absoluteUrl(value: string | null | undefined, baseUrl: URL) {
   }
 }
 
+function socialFingerprint(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function getShareVersion(
   searchParams: Record<string, string | string[] | undefined>,
 ) {
@@ -153,12 +162,15 @@ export async function generateMetadata({
    */
   const originalPreviewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
 
-  const cropVersion = [
+  const cropVersion = socialFingerprint([
     invitation.updated_at ?? "",
+    invitation.event_title ?? "",
+    invitation.invitation_text ?? "",
+    invitation.hero_image_url ?? "",
     invitation.hero_image_zoom ?? 1,
     invitation.hero_image_x ?? 50,
     invitation.hero_image_y ?? 50,
-  ].join("-");
+  ].join("|"));
 
   const croppedPreviewUrl = new URL(
     `/c/${encodeURIComponent(slug)}/og-image`,
