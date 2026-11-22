@@ -26,8 +26,13 @@ export async function POST(request: Request) {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
       return NextResponse.json(
-        { ok: false, error: error.message || "Não foi possível alterar a senha." },
-        { status: 400 },
+        {
+          ok: false,
+          error: /fetch failed|failed to fetch/i.test(error.message)
+            ? "O serviço de acesso está temporariamente indisponível. Tente novamente em alguns instantes."
+            : (error.message || "Não foi possível alterar a senha."),
+        },
+        { status: /fetch failed|failed to fetch/i.test(error.message) ? 503 : 400 },
       );
     }
 
