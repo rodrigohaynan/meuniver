@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Eye, EyeOff, Loader2, LockKeyhole } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 
 export function ResetPasswordCard() {
-  const supabase = useMemo(() => createClient(), []);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -30,14 +28,16 @@ export function ResetPasswordCard() {
     setMessage("");
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setMessage("Este link de recuperação expirou ou não é mais válido. Solicite um novo link.");
-        return;
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ password }),
+      });
+      const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || "Não foi possível alterar a senha.");
       }
-
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
 
       setSuccess(true);
       setMessage("Senha alterada com sucesso. Você já pode acessar sua conta com a nova senha.");
