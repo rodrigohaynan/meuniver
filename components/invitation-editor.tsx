@@ -793,7 +793,7 @@ export function InvitationEditor({
                 <button
                   type="button"
                   onClick={shareInvitationOnWhatsapp}
-                  className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                  className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-50 px-3 text-[12px] font-bold leading-4 tracking-normal text-emerald-700 transition hover:bg-emerald-100"
                   aria-label="Compartilhar convite no WhatsApp"
                 >
                   WhatsApp
