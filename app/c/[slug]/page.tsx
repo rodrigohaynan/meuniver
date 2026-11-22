@@ -153,10 +153,23 @@ export async function generateMetadata({
    */
   const originalPreviewImage = absoluteUrl(invitation.hero_image_url, baseUrl);
 
+  const cropVersion = [
+    invitation.updated_at ?? "",
+    invitation.hero_image_zoom ?? 1,
+    invitation.hero_image_x ?? 50,
+    invitation.hero_image_y ?? 50,
+  ].join("-");
+
+  const croppedPreviewUrl = new URL(
+    `/c/${encodeURIComponent(slug)}/og-image`,
+    baseUrl,
+  );
+  croppedPreviewUrl.searchParams.set("v", cropVersion);
+
   const whatsappPreviewImage =
     slug === "theo-rhaian"
       ? new URL("/social/theo-rhaian-whatsapp.jpg", baseUrl).toString()
-      : absoluteUrl(invitation.share_image_url, baseUrl);
+      : croppedPreviewUrl.toString();
 
   const host = (invitation.host_name ?? "").trim();
   const occasion = eventTypeMeta(eventTypeFor(invitation)).label;
@@ -180,7 +193,7 @@ export async function generateMetadata({
       // Para Théo, priorizar o JPEG estático local; a foto PNG original
       // pode ser grande e deve ficar apenas como alternativa.
       images: [
-        ...(slug === "theo-rhaian" && whatsappPreviewImage
+        ...(whatsappPreviewImage
           ? [{
               url: whatsappPreviewImage,
               width: 1200,
@@ -195,28 +208,17 @@ export async function generateMetadata({
               alt: imageAlt,
             }]
           : []),
-        ...(slug !== "theo-rhaian" && whatsappPreviewImage
-          ? [{
-              url: whatsappPreviewImage,
-              width: 1200,
-              height: 630,
-              type: "image/jpeg",
-              alt: imageAlt,
-            }]
-          : []),
       ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: slug === "theo-rhaian" && whatsappPreviewImage
+      images: whatsappPreviewImage
         ? [whatsappPreviewImage]
         : originalPreviewImage
           ? [originalPreviewImage]
-          : whatsappPreviewImage
-            ? [whatsappPreviewImage]
-            : undefined,
+          : undefined,
     },
   };
 }
