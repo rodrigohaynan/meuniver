@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import {
   CalendarDays,
   Eye,
@@ -70,8 +69,6 @@ export function AuthCard() {
   const [rememberUser, setRememberUser] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-
-  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     try {
@@ -163,44 +160,61 @@ export function AuthCard() {
 
     try {
       if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/auth/callback?next=/redefinir-senha`,
+        const response = await fetch("/api/auth/recover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ email: email.trim() }),
         });
-        if (error) throw error;
-        setMessage("Enviamos um link para redefinir sua senha. Verifique sua caixa de entrada e também a pasta de spam.");
+        const result = await response.json().catch(() => null) as { ok?: boolean; error?: string; message?: string } | null;
+        if (!response.ok || !result?.ok) throw new Error(result?.error || "Não foi possível enviar o link de recuperação.");
+        setMessage(result.message || "Confira seu e-mail para redefinir a senha.");
         return;
       }
 
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              full_name: fullName.trim().replace(/\s+/g, " "),
-              sex,
-              birth_date: birthDate,
-              state: stateUf,
-              city,
-              whatsapp: digits(whatsapp),
-            },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/painel`,
-          },
+        const response = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+            fullName: fullName.trim().replace(/\s+/g, " "),
+            sex,
+            birthDate,
+            state: stateUf,
+            city,
+            whatsapp: digits(whatsapp),
+          }),
         });
-        if (error) throw error;
+        const result = await response.json().catch(() => null) as { ok?: boolean; error?: string; hasSession?: boolean } | null;
+        if (!response.ok || !result?.ok) throw new Error(result?.error || "Não foi possível criar a conta.");
+
         persistRememberedEmail();
-        setMessage(
-          "Conta criada. Se a confirmação de e-mail estiver ativa, verifique sua caixa de entrada para concluir o cadastro.",
-        );
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (error) throw error;
-        persistRememberedEmail();
-        window.location.href = "/painel";
+        if (result.hasSession) {
+          window.location.href = "/painel";
+          return;
+        }
+
+        setMessage("Conta criada. Verifique sua caixa de entrada para confirmar seu e-mail e concluir o cadastro.");
+        return;
       }
+
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
+      const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+      if (!response.ok || !result?.ok) throw new Error(result?.error || "Não foi possível entrar.");
+
+      persistRememberedEmail();
+      window.location.href = "/painel";
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível entrar.");
     } finally {
