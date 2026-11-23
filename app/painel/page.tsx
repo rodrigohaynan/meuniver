@@ -88,7 +88,7 @@ export default async function DashboardPage() {
                 </div>
                 <h2 className="mt-4 font-display text-2xl font-bold text-[#3a1d25]">{invitation.event_title}</h2>
                 <p className="mt-1 text-sm text-[#806e72]">{eventTypeMeta(eventTypeFor(invitation)).label}{invitation.host_name ? ` • ${invitation.host_name}` : ""}{eventUsesAge(eventTypeFor(invitation)) ? ` • ${formatAge(invitation.age, invitation.age_unit)}` : ""}</p>
-                {invitation.billing_status === "pending" && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">A publicação ficará disponível após a liberação financeira.</p>}
+                {invitation.billing_status === "pending" && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">Monte e confira o convite; a publicação é liberada com um PIX único na tela de edição.</p>}
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href={`/painel/convites/${invitation.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white"><Settings2 className="size-4" /> Editar</Link>
                   {invitation.status === "published" && (

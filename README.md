@@ -84,3 +84,17 @@ Marca pública: **Convidata**, no domínio principal `https://convidata.com.br` 
 - `app/robots.ts` e `app/sitemap.ts` geram `/robots.txt` e `/sitemap.xml` com o domínio `https://convidata.com.br`. Convites individuais (`/c/*`) ficam fora dos buscadores, sem afetar a prévia no WhatsApp.
 - `/auth/callback` só redireciona para caminhos internos do próprio site.
 - Relatórios CSV do admin neutralizam valores iniciados por `=`, `+`, `-` ou `@` (injeção de fórmulas no Excel).
+
+## Cobrança (preparada, desligada)
+
+Hoje tudo é gratuito. A estrutura para cobrar já está pronta e é ligada pelo painel `/admin/financeiro`:
+
+- **Taxa nos presentes em PIX** — campo "Taxa da plataforma" (hoje 0%; previsto 2%). Com "Quem paga a taxa" = Convidado, a taxa é **somada** ao valor do PIX e o organizador recebe o presente integral. A Convidata recebe a taxa via `application_fee` do Mercado Pago.
+- **Publicação do convite** — "Cobrar por novos convites" (hoje desligado; preço já em R$ 4,99). O organizador monta e confere o convite; ao clicar em Publicar, paga um PIX direto para a conta da Convidata e o convite é publicado automaticamente após a confirmação. Convites criados antes de ligar a cobrança continuam gratuitos.
+
+Para ligar a cobrança da publicação:
+1. Defina `MERCADO_PAGO_PLATFORM_ACCESS_TOKEN` no Netlify (access token de produção da conta Mercado Pago da Convidata).
+2. A confirmação chega por consulta automática e pelo webhook `https://convidata.com.br/api/billing/webhook` (enviado em cada cobrança; não precisa cadastrar no painel do Mercado Pago).
+3. Ative "Cobrar por novos convites" no admin.
+
+Migração necessária: `supabase/MIGRACAO_018_COBRANCA_PREPARADA.sql`.

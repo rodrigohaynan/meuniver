@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { PixFeeNote, usePixFeeConfig } from "@/components/pix-fee-note";
 import { getTheme } from "@/lib/themes";
 import type { Invitation, Rsvp } from "@/lib/types";
 
@@ -62,6 +63,7 @@ type PixGiftData = {
   paymentId: string;
   status: string;
   amount: number;
+  total?: number;
   platformFee: number;
   qrCode: string | null;
   qrCodeBase64: string | null;
@@ -154,6 +156,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
   const [pixBusy, setPixBusy] = useState(false);
   const [pixError, setPixError] = useState("");
   const [pixData, setPixData] = useState<PixGiftData | null>(null);
+  const pixFeeConfig = usePixFeeConfig(showPixGift);
   const [pixCopied, setPixCopied] = useState(false);
   const [pixApproved, setPixApproved] = useState(false);
 
@@ -591,6 +594,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
                 <label className="text-sm font-bold">CPF<input value={pixCpf} onChange={(event) => setPixCpf(formatCpf(event.target.value))} required inputMode="numeric" className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3" /></label>
                 <label className="text-sm font-bold sm:col-span-2">Valor (R$)<input type="number" min={5} max={10000} step="0.01" value={pixAmount} onChange={(event) => setPixAmount(event.target.value)} required className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3" /></label>
               </div>
+              <PixFeeNote amount={Number(pixAmount)} config={pixFeeConfig} />
               {pixError && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{pixError}</p>}
               <button disabled={pixBusy} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white disabled:opacity-60">{pixBusy && <Loader2 className="size-4 animate-spin" />} Gerar PIX</button>
             </form>
@@ -598,7 +602,7 @@ export function PublicRsvpForm({ invitation }: { invitation: Invitation }) {
             <div className="text-center">
               <CircleDollarSign className="mx-auto size-10 text-[#7d1f37]" />
               <h3 className="mt-3 font-display text-2xl font-bold">{pixApproved ? "Pagamento confirmado" : "PIX gerado"}</h3>
-              <p className="mt-2 text-sm text-[#806e72]">Valor: {formatCurrency(pixData.amount)}</p>
+              <p className="mt-2 text-sm text-[#806e72]">Valor: {formatCurrency(pixData.amount)}{pixData.total && pixData.total > pixData.amount ? ` • total do PIX ${formatCurrency(pixData.total)} (inclui taxa de serviço)` : ""}</p>
               {pixData.qrCodeBase64 && <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="QR Code PIX" className="mx-auto mt-5 size-56 rounded-xl border border-[#eaded8] bg-white p-2" />}
               {pixData.qrCode && <button type="button" onClick={() => void copyPixCode()} className="mt-4 inline-flex h-11 items-center gap-2 rounded-full border border-[#d8c7bd] px-5 font-bold text-[#684f55]"><Clipboard className="size-4" /> {pixCopied ? "Copiado" : "Copiar código PIX"}</button>}
               {pixData.ticketUrl && <a href={pixData.ticketUrl} target="_blank" rel="noreferrer" className="mt-3 block text-sm font-bold text-[#7d1f37]">Abrir pagamento</a>}

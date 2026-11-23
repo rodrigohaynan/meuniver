@@ -157,21 +157,28 @@ export async function createMercadoPagoPixPayment({
   idempotencyKey,
   externalReference,
   amount,
-  applicationFee,
+  applicationFee = 0,
   description,
   payerEmail,
   payerName,
   payerCpf,
+  notificationUrl,
+  expiresAt,
 }: {
   accessToken: string;
   idempotencyKey: string;
   externalReference: string;
   amount: number;
-  applicationFee: number;
+  /** Taxa da plataforma (marketplace). Omitida quando zero. */
+  applicationFee?: number;
   description: string;
   payerEmail: string;
   payerName: string;
   payerCpf: string;
+  /** URL pública para o Mercado Pago avisar mudanças de status. */
+  notificationUrl?: string;
+  /** Validade do QR Code PIX. */
+  expiresAt?: Date;
 }) {
   const response = await fetch(`${MP_API}/v1/payments`, {
     method: "POST",
@@ -186,7 +193,9 @@ export async function createMercadoPagoPixPayment({
       description: description.slice(0, 150),
       payment_method_id: "pix",
       external_reference: externalReference,
-      application_fee: applicationFee,
+      ...(applicationFee > 0 ? { application_fee: applicationFee } : {}),
+      ...(notificationUrl ? { notification_url: notificationUrl } : {}),
+      ...(expiresAt ? { date_of_expiration: expiresAt.toISOString().replace("Z", "+00:00") } : {}),
       payer: {
         email: payerEmail,
         first_name: payerName.slice(0, 100),
