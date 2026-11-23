@@ -21,6 +21,8 @@ export function PublicGiftExtras({
   giftEnabled,
   giftIntroText,
   giftProfile,
+  giftProfileEnabled = true,
+  giftProfileTitle,
   gifts,
 }: {
   hostName: string;
@@ -28,13 +30,20 @@ export function PublicGiftExtras({
   giftEnabled: boolean;
   giftIntroText?: string | null;
   giftProfile: GiftProfileItem[];
+  /** Quando falso, a seção de tamanhos fica oculta (os dados continuam salvos). */
+  giftProfileEnabled?: boolean;
+  giftProfileTitle?: string | null;
   gifts: GiftItem[];
 }) {
   const theme = getTheme(themeKey);
   const supabase = useMemo(() => createClient(), []);
-  const profile = (Array.isArray(giftProfile) ? giftProfile : []).filter(
-    (item) => item?.label?.trim() && item?.value?.trim(),
-  );
+  const profile = giftProfileEnabled
+    ? (Array.isArray(giftProfile) ? giftProfile : []).filter(
+        (item) => item?.label?.trim() && item?.value?.trim(),
+      )
+    : [];
+  const profileTitle =
+    giftProfileTitle?.trim() || `Tamanhos e preferências de ${hostName || "quem está comemorando"}`;
   const [items, setItems] = useState(
     gifts.map((gift) => ({
       ...gift,
@@ -116,7 +125,7 @@ export function PublicGiftExtras({
                   Para ajudar no presente
                 </p>
                 <h2 className="mt-1 font-display text-2xl font-bold sm:text-3xl">
-                  Tamanhos e preferências de {hostName || "quem está comemorando"}
+                  {profileTitle}
                 </h2>
                 <p style={{ color: theme.colors.muted }} className="mt-2 text-sm leading-6">
                   Estas informações foram deixadas pelo organizador para ajudar você a escolher algo no tamanho e estilo certos.

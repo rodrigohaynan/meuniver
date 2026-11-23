@@ -39,6 +39,10 @@ export type Invitation = {
   gift_enabled: boolean;
   gift_intro_text: string;
   gift_profile: GiftProfileItem[];
+  /** Exibe a seção "Tamanhos e preferências" no convite (padrão: sim). */
+  gift_profile_enabled?: boolean;
+  /** Título personalizado da seção; vazio usa "Tamanhos e preferências de {anfitrião}". */
+  gift_profile_title?: string | null;
   rsvp_enabled: boolean;
   pix_gift_enabled: boolean;
   billing_status: InvitationBillingStatus;

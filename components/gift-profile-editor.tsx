@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Gift, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Gift, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { GiftProfileItem } from "@/lib/types";
 
@@ -32,17 +32,27 @@ export function GiftProfileEditor({
   invitationId,
   hostName,
   initialProfile,
+  initialEnabled = true,
+  initialTitle = "",
 }: {
   invitationId: string;
   hostName: string;
   initialProfile: GiftProfileItem[];
+  initialEnabled?: boolean;
+  initialTitle?: string;
 }) {
   const [items, setItems] = useState<GiftProfileItem[]>(
     Array.isArray(initialProfile) ? initialProfile : [],
   );
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [title, setTitle] = useState(initialTitle);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageOk, setMessageOk] = useState(true);
   const supabase = useMemo(() => createClient(), []);
+  const defaultTitle = `Tamanhos e preferências de ${hostName || "quem está comemorando"}`;
+  const savedCount = cleanProfile(items).length;
+  const status = !savedCount ? "Vazia" : enabled ? "Visível no convite" : "Oculta no convite";
 
   function updateItem(index: number, patch: Partial<GiftProfileItem>) {
     setItems((current) =>
@@ -61,25 +71,47 @@ export function GiftProfileEditor({
     setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  async function save() {
+  async function save(nextEnabled = enabled) {
     if (saving) return;
     setSaving(true);
     setMessage("");
 
     const profile = cleanProfile(items);
+    const cleanTitle = title.trim().replace(/\s+/g, " ").slice(0, 90);
     const { error } = await supabase
       .from("invitations")
-      .update({ gift_profile: profile })
+      .update({
+        gift_profile: profile,
+        gift_profile_enabled: nextEnabled,
+        gift_profile_title: cleanTitle || null,
+      })
       .eq("id", invitationId);
 
     setSaving(false);
     if (error) {
-      setMessage(error.message);
+      setMessageOk(false);
+      setMessage(`Não foi possível salvar: ${error.message}`);
       return;
     }
 
     setItems(profile);
-    setMessage("Informações para presentes salvas.");
+    setTitle(cleanTitle);
+    setEnabled(nextEnabled);
+    setMessageOk(true);
+    setMessage(
+      nextEnabled === enabled
+        ? "Informações salvas."
+        : nextEnabled
+          ? "Seção visível no convite."
+          : "Seção ocultada do convite. As informações continuam salvas.",
+    );
+  }
+
+  function clearAll() {
+    if (!items.length) return;
+    if (!window.confirm("Apagar todas as informações de tamanhos e preferências?")) return;
+    setItems([]);
+    setMessage("");
   }
 
   return (
@@ -92,10 +124,44 @@ export function GiftProfileEditor({
           <span className="block font-display text-xl font-bold text-[#351820]">Tamanhos e preferências para presentes</span>
           <span className="mt-0.5 block text-sm text-[#806e72]">Ajude os convidados a acertar no presente de {hostName || "quem está comemorando"}.</span>
         </span>
+        <span className={`ml-auto shrink-0 rounded-full px-3 py-1 text-xs font-bold ${status === "Visível no convite" ? "bg-emerald-50 text-emerald-700" : status === "Oculta no convite" ? "bg-[#f5ece7] text-[#7d1f37]" : "bg-[#f3eeea] text-[#806e72]"}`}>
+          {status}
+        </span>
       </summary>
 
       <div className="border-t border-[#eee4de] px-5 py-5 sm:px-7">
-        <p className="text-sm leading-6 text-[#806e72]">
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-[#e7dcd5] bg-white px-4 py-3">
+          <span className="flex items-center gap-3">
+            {enabled ? <Eye className="size-4.5 text-emerald-700" /> : <EyeOff className="size-4.5 text-[#7d1f37]" />}
+            <span>
+              <span className="block text-sm font-bold text-[#351820]">Mostrar esta seção no convite</span>
+              <span className="block text-xs text-[#806e72]">Desative para esconder dos convidados sem apagar as informações.</span>
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={enabled}
+            disabled={saving}
+            onChange={(event) => void save(event.target.checked)}
+            className="size-5 shrink-0 accent-[#7d1f37]"
+            aria-label="Mostrar a seção de tamanhos e preferências no convite"
+          />
+        </label>
+
+        <label className="mt-4 block text-sm font-bold text-[#351820]">
+          Título da seção
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            maxLength={90}
+            placeholder={defaultTitle}
+            className="mt-2 h-10 w-full rounded-xl border border-[#d8c7bd] px-3 text-sm font-normal outline-none focus:border-[#9e6172]"
+          />
+          <span className="mt-1 block text-xs font-normal text-[#806e72]">Deixe em branco para usar o título padrão.</span>
+        </label>
+
+        <p className="mt-4 text-sm leading-6 text-[#806e72]">
           Cadastre somente informações úteis. Você pode usar os exemplos abaixo ou criar qualquer outro campo, como numeração de roupa, tamanho de capacete, pulseira, preferências, restrições ou medidas.
         </p>
 
@@ -138,11 +204,16 @@ export function GiftProfileEditor({
           <button type="button" onClick={addItem} disabled={items.length >= 20} className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-4 text-sm font-bold text-[#684f55] disabled:opacity-50">
             <Plus className="size-4" /> Adicionar informação
           </button>
+          {items.length > 0 && (
+            <button type="button" onClick={clearAll} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">
+              <Trash2 className="size-4" /> Apagar tudo
+            </button>
+          )}
           <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-5 text-sm font-bold text-white disabled:opacity-50">
             {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             Salvar informações
           </button>
-          {message && <span className={`text-sm font-bold ${message.includes("salvas") ? "text-emerald-700" : "text-red-700"}`}>{message}</span>}
+          {message && <span className={`text-sm font-bold ${messageOk ? "text-emerald-700" : "text-red-700"}`}>{message}</span>}
         </div>
       </div>
     </details>

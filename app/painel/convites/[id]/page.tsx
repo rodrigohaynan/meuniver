@@ -67,6 +67,8 @@ export default async function InvitationEditorPage({ params }: { params: Promise
         invitationId={invitation.id}
         hostName={invitation.host_name}
         initialProfile={invitation.gift_profile ?? []}
+        initialEnabled={invitation.gift_profile_enabled !== false}
+        initialTitle={invitation.gift_profile_title ?? ""}
       />
 
       <GiftReservationModeEditor

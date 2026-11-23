@@ -4,7 +4,7 @@ CONVIDATA — PASSO A PASSO PARA PUBLICAR
    - Use um projeto Supabase exclusivo da Convidata.
    - Abra SQL Editor e execute supabase/schema.sql.
    - Em seguida execute as migrações da pasta supabase/ em ordem numérica
-     (MIGRACAO_002 ... MIGRACAO_017). Onde houver dois arquivos com o mesmo
+     (MIGRACAO_002 ... MIGRACAO_019). Onde houver dois arquivos com o mesmo
      número, execute ambos.
 
 2) CHAVES DO SUPABASE
