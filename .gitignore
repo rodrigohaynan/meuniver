@@ -1,0 +1,19 @@
+# dependências
+node_modules/
+
+# build do Next.js / Netlify
+.next/
+out/
+.netlify/
+*.tsbuildinfo
+
+# variáveis de ambiente (nunca versionar chaves)
+.env
+.env.*
+!env.example
+
+# sistema / editores
+.DS_Store
+*.log
+.vscode/
+.idea/

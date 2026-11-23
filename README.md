@@ -67,3 +67,10 @@ A plataforma foi estruturada para permitir provedores sociais no futuro, mas ele
 ## Marca e migração de domínio
 
 Marca pública: **Convidata**. O domínio e os links antigos em `convniver.netlify.app` permanecem ativos para não quebrar convites e integrações existentes. Não substitua `NEXT_PUBLIC_APP_URL` nem as URLs de autenticação e callbacks por um domínio novo antes de registrá-lo e configurá-lo no Netlify e no Supabase. Após a migração, estabeleça redirecionamentos do domínio antigo e atualize metadados, URLs de autenticação e credenciais dos provedores externos. O nome da marca não depende do nome técnico do repositório GitHub ou do site Netlify.
+
+## Segurança e SEO (configuração no código)
+
+- `next.config.ts` aplica cabeçalhos de segurança (nosniff, Referrer-Policy, X-Frame-Options, Permissions-Policy, HSTS) e `noindex` nas áreas privadas.
+- `app/robots.ts` e `app/sitemap.ts` geram `/robots.txt` e `/sitemap.xml` com o domínio `https://convidata.com.br`. Convites individuais (`/c/*`) ficam fora dos buscadores, sem afetar a prévia no WhatsApp.
+- `/auth/callback` só redireciona para caminhos internos do próprio site.
+- Relatórios CSV do admin neutralizam valores iniciados por `=`, `+`, `-` ou `@` (injeção de fórmulas no Excel).
