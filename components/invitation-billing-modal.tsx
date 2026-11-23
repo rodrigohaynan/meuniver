@@ -92,8 +92,6 @@ export function InvitationBillingModal({
       active = false;
       window.clearInterval(timer);
     };
-    // confirmPaid usa apenas refs e setters estáveis.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waiting, invitationId]);
 
   async function generatePix(event: FormEvent<HTMLFormElement>) {
