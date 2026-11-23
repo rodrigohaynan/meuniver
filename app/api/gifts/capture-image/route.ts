@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Informe o link de sugestão antes de capturar a imagem." }, { status: 400 });
   }
 
-  // Mesma prioridade usada no convite da Liene: foto manual não é substituída
+  // Foto manual tem prioridade e não é substituída
   // pela captura automática. A imagem do link fica armazenada separadamente.
   if (gift.manual_image_url) {
     return Response.json({
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     return Response.json({ imageUrl, suggestionUrl, imageCaptured: true });
   } catch (error) {
-    // Igual ao convite da Liene: se a gravação automática não funcionar,
+    // Se a gravação automática não funcionar,
     // não salvamos URL externa quebrada nem imagem institucional. O card ainda
     // poderá tentar o proxy ao vivo, usando uma URL única por presente/link.
     return Response.json(

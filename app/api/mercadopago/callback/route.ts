@@ -14,8 +14,8 @@ function paymentSettingsUrl(request: NextRequest, params?: Record<string, string
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim();
   const returnedState = request.nextUrl.searchParams.get("state")?.trim();
-  const expectedState = request.cookies.get("convniver_mp_state")?.value;
-  const verifier = request.cookies.get("convniver_mp_verifier")?.value;
+  const expectedState = request.cookies.get("convidata_mp_state")?.value;
+  const verifier = request.cookies.get("convidata_mp_verifier")?.value;
 
   if (!code || !returnedState || !expectedState || returnedState !== expectedState || !verifier) {
     return NextResponse.redirect(paymentSettingsUrl(request, { erro: "oauth" }));
@@ -47,11 +47,11 @@ export async function GET(request: NextRequest) {
     if (error) throw new Error(error.message);
 
     const response = NextResponse.redirect(paymentSettingsUrl(request, { conectado: "1" }));
-    response.cookies.delete("convniver_mp_state");
-    response.cookies.delete("convniver_mp_verifier");
+    response.cookies.delete("convidata_mp_state");
+    response.cookies.delete("convidata_mp_verifier");
     return response;
   } catch (error) {
-    console.error("[CONVNIVER] Erro OAuth Mercado Pago:", error);
+    console.error("[Convidata] Erro OAuth Mercado Pago:", error);
     return NextResponse.redirect(paymentSettingsUrl(request, { erro: "conexao" }));
   }
 }

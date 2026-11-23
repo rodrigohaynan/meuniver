@@ -1,63 +1,54 @@
-MEU CONVITE — PASSO A PASSO PARA PUBLICAR (FASE DE TESTES GRATUITA)
+CONVIDATA — PASSO A PASSO PARA PUBLICAR
 
-1) CRIE UM NOVO PROJETO NO SUPABASE
-   - Não use o banco do convite da Liene.
-   - Abra SQL Editor.
-   - Cole e execute todo o conteúdo de supabase/schema.sql.
+1) PROJETO SUPABASE
+   - Use um projeto Supabase exclusivo da Convidata.
+   - Abra SQL Editor e execute supabase/schema.sql.
+   - Em seguida execute as migrações da pasta supabase/ em ordem numérica
+     (MIGRACAO_002 ... MIGRACAO_017). Onde houver dois arquivos com o mesmo
+     número, execute ambos.
 
-2) COPIE AS CHAVES DO SUPABASE
+2) CHAVES DO SUPABASE
    Project Settings > API:
    - Project URL
    - anon / publishable key
+   - service_role key (somente servidor)
 
-3) CONFIGURE AS VARIÁVEIS NO NETLIFY
+3) VARIÁVEIS NO NETLIFY (Project configuration > Environment variables)
    NEXT_PUBLIC_SUPABASE_URL
    NEXT_PUBLIC_SUPABASE_ANON_KEY
-   NEXT_PUBLIC_APP_URL
-   NEXT_PUBLIC_APP_NAME
+   SUPABASE_SERVICE_ROLE_KEY        (marcar como secreta)
+   NEXT_PUBLIC_APP_URL = https://convidata.com.br
+   NEXT_PUBLIC_APP_NAME = Convidata
+   MERCADO_PAGO_CLIENT_ID           (presentes em PIX)
+   MERCADO_PAGO_CLIENT_SECRET       (presentes em PIX, marcar como secreta)
+   OPENGRAPH_IO_APP_ID              (opcional: captura de imagens de anúncios)
 
-4) AUTENTICAÇÃO GRATUITA PARA O MVP
+4) AUTENTICAÇÃO
    Supabase > Authentication > Providers:
    - Email: ATIVADO.
-   - Google: DESATIVADO.
-   - Facebook: DESATIVADO.
-   - Phone/SMS: DESATIVADO.
-   - Apple, Azure, Discord e demais provedores externos: DESATIVADOS.
-
-   Para testar sem depender de serviço de e-mail externo, você pode temporariamente
-   desativar a exigência de confirmação de e-mail no Supabase. Antes de abrir a
-   plataforma ao público, reative a confirmação e configure um serviço de e-mail adequado.
+   - Google, Facebook, Phone/SMS, Apple e demais: DESATIVADOS por enquanto.
+   Antes de abrir ao público, mantenha a confirmação de e-mail ativa e
+   configure um serviço de envio de e-mail (SMTP).
 
 5) URLS DE AUTENTICAÇÃO
    Supabase > Authentication > URL Configuration:
-   Site URL = https://SEU-SITE.netlify.app
+   Site URL = https://convidata.com.br
    Redirect URLs:
-   https://SEU-SITE.netlify.app/auth/callback
+   https://convidata.com.br/auth/callback
+   https://*--convidata.netlify.app/auth/callback   (deploy previews)
    http://localhost:3000/auth/callback
 
-6) GITHUB
-   Recomendado: criar um NOVO repositório para esta plataforma.
-   Não substitua o repositório do convite da Liene enquanto ele estiver em uso.
+6) MERCADO PAGO
+   Mercado Pago Developers > Suas integrações > aplicação da Convidata:
+   Redirect URL = https://convidata.com.br/api/mercadopago/callback
 
 7) NETLIFY
-   Conecte o novo repositório.
-   Build command: npm run build
-   O Netlify detectará Next.js.
-   Node: 22.
+   Repositório: rodrigohaynan/meuniver (branch main).
+   Build command: npm run build — o Netlify detecta Next.js. Node 22.
 
-8) PRIMEIRO TESTE
-   - Criar conta por e-mail e senha.
-   - Fazer login.
-   - Criar convite.
-   - Escolher tema.
-   - Enviar foto.
-   - Adicionar presentes.
-   - Publicar.
-   - Abrir /c/slug em janela anônima.
-   - Confirmar presença.
-   - Reservar um presente.
-   - Verificar que o dono enxerga as respostas no painel.
-
-PROVEDORES FUTUROS
-   Google, Facebook, telefone/SMS e outros métodos permanecem fora do MVP.
-   Eles podem ser habilitados depois, quando houver necessidade real e orçamento.
+8) TESTE APÓS CADA DEPLOY
+   - Criar conta, fazer login e recuperar senha.
+   - Criar convite, escolher tema, enviar foto, adicionar presentes, publicar.
+   - Abrir /c/slug em janela anônima, confirmar presença, reservar presente.
+   - Conferir as respostas no painel.
+   - Compartilhar o link no WhatsApp e conferir a prévia.

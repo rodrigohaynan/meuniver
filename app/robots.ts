@@ -13,6 +13,5 @@ export default function robots(): MetadataRoute.Robots {
       disallow: ["/painel", "/admin", "/api/", "/auth/", "/redefinir-senha", "/c/", "/s/"],
     },
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
   };
 }

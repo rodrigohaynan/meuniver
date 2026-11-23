@@ -47,13 +47,23 @@ Copie os valores de `env.example` e configure:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_APP_URL`
-- `NEXT_PUBLIC_APP_NAME`
+- `NEXT_PUBLIC_APP_NAME` (use `Convidata`)
+- `SUPABASE_SERVICE_ROLE_KEY` (somente servidor; marque como secreta)
+- `MERCADO_PAGO_CLIENT_ID` e `MERCADO_PAGO_CLIENT_SECRET` (necessárias para presentes em PIX; o redirect URI do app no Mercado Pago deve ser `https://convidata.com.br/api/mercadopago/callback`)
 
 ## 3. Instalar localmente
 
 ```bash
 npm install
 npm run dev
+```
+
+Verificações (as mesmas rodadas automaticamente pelo GitHub Actions em cada push e PR):
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
 ```
 
 ## 4. Deploy
@@ -66,7 +76,7 @@ A plataforma foi estruturada para permitir provedores sociais no futuro, mas ele
 
 ## Marca e migração de domínio
 
-Marca pública: **Convidata**. O domínio e os links antigos em `convniver.netlify.app` permanecem ativos para não quebrar convites e integrações existentes. Não substitua `NEXT_PUBLIC_APP_URL` nem as URLs de autenticação e callbacks por um domínio novo antes de registrá-lo e configurá-lo no Netlify e no Supabase. Após a migração, estabeleça redirecionamentos do domínio antigo e atualize metadados, URLs de autenticação e credenciais dos provedores externos. O nome da marca não depende do nome técnico do repositório GitHub ou do site Netlify.
+Marca pública: **Convidata**, no domínio principal `https://convidata.com.br` (configurado no Netlify e em `NEXT_PUBLIC_APP_URL`). Os endereços `convidata.netlify.app` e `convniver.netlify.app` continuam respondendo para não quebrar links antigos. Ao trocar de domínio no futuro, atualize junto: `NEXT_PUBLIC_APP_URL`, a constante `siteUrl` em `app/layout.tsx`, `app/robots.ts` e `app/sitemap.ts`, as URLs de autenticação no Supabase e o redirect URI do app no Mercado Pago. O nome da marca não depende do nome técnico do repositório GitHub ou do site Netlify.
 
 ## Segurança e SEO (configuração no código)
 
