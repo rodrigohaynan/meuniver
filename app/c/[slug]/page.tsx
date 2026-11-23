@@ -269,6 +269,8 @@ export default async function PublicInvitationPage({ params }: PageProps) {
         giftEnabled={invitation.gift_enabled}
         giftIntroText={invitation.gift_intro_text}
         giftProfile={invitation.gift_profile ?? []}
+        giftProfileEnabled={invitation.gift_profile_enabled !== false}
+        giftProfileTitle={invitation.gift_profile_title}
         gifts={gifts}
       />
     </>
