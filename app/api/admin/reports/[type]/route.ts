@@ -5,7 +5,11 @@ import { getSiteAdminUser } from "@/lib/site-admin";
 export const dynamic = "force-dynamic";
 
 function csvCell(value: unknown) {
-  const text = String(value ?? "").replace(/"/g, '""');
+  let text = String(value ?? "");
+  // Evita injeção de fórmulas ao abrir o CSV no Excel/Planilhas: nomes e
+  // contatos vêm de convidados e podem começar com =, +, -, @, tab ou CR.
+  if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  text = text.replace(/"/g, '""');
   return `"${text}"`;
 }
 

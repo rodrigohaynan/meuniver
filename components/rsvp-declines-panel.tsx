@@ -64,10 +64,10 @@ export function RsvpDeclinesPanel({
         return;
       }
 
-      let host = document.getElementById("convniver-rsvp-declines-slot");
+      let host = document.getElementById("convidata-rsvp-declines-slot");
       if (!host) {
         host = document.createElement("div");
-        host.id = "convniver-rsvp-declines-slot";
+        host.id = "convidata-rsvp-declines-slot";
       }
 
       if (host.parentElement !== reservationsHeading.parentElement || host.nextSibling !== reservationsHeading) {

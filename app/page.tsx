@@ -39,7 +39,7 @@ export default async function HomePage() {
               Ver recursos
             </a>
           </div>
-          <p className="mt-3 text-sm text-[#8b777c]">Comece com e-mail, Google ou Facebook.</p>
+          <p className="mt-3 text-sm text-[#8b777c]">Cadastro rápido com e-mail e senha.</p>
         </div>
 
         <div className="relative mx-auto w-full max-w-[500px] lg:mx-0 lg:justify-self-end">

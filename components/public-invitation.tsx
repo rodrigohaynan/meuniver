@@ -790,12 +790,13 @@ function Modal({
 }
 
 function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const storedSuggestionImage = isStoredSuggestionImage(gift.suggestion_image_url) ? gift.suggestion_image_url : null;
   const proxyImage = gift.suggestion_url ? suggestionImageProxyUrl(gift.id, gift.suggestion_url) : null;
   const src = gift.manual_image_url || storedSuggestionImage || proxyImage;
 
-  useEffect(() => { setFailed(false); }, [gift.id, gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url, src]);
+  // A falha vale só para a URL que falhou: ao trocar a imagem, tenta de novo.
+  const failed = Boolean(src) && failedSrc === src;
 
   if (!src || failed) {
     return <div className="relative grid aspect-[4/3] place-items-center bg-[var(--i-soft)]"><Gift className="size-10 text-[var(--i-accent)]" /><span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)]">{String(index + 1).padStart(2, "0")}</span></div>;
@@ -803,7 +804,7 @@ function GiftProductImage({ gift, index }: { gift: GiftItem; index: number }) {
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden bg-[var(--i-soft)]">
-      <img key={gift.manual_image_url ?? storedSuggestionImage ?? gift.suggestion_url ?? gift.id} src={src} alt={`Imagem sugerida de ${gift.name}`} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]" onError={() => setFailed(true)} />
+      <img key={gift.manual_image_url ?? storedSuggestionImage ?? gift.suggestion_url ?? gift.id} src={src} alt={`Imagem sugerida de ${gift.name}`} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.02]" onError={() => setFailedSrc(src)} />
       <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-[var(--i-muted)] shadow-sm">{String(index + 1).padStart(2, "0")}</span>
     </div>
   );

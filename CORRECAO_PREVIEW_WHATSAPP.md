@@ -17,12 +17,12 @@ A rota antiga `app/c/[slug]/og-image/route.tsx` foi mantida por compatibilidade,
 ## Depois de enviar ao GitHub
 
 1. Aguarde o Netlify concluir um novo deploy.
-2. Em Netlify > Environment variables, mantenha `NEXT_PUBLIC_APP_URL` como a URL pública atual do site (por exemplo, `https://convniver.netlify.app`). A correção não depende mais exclusivamente dela, mas vale deixá-la correta.
+2. Em Netlify > Environment variables, mantenha `NEXT_PUBLIC_APP_URL` como a URL pública atual do site (hoje, `https://convidata.com.br`). A correção não depende mais exclusivamente dela, mas vale deixá-la correta.
 3. Teste diretamente no navegador:
-   - `https://convniver.netlify.app/c/theo-rhaian/og-image.jpg`
+   - `https://convidata.com.br/c/SEU-SLUG/og-image.jpg`
    Deve abrir uma imagem JPEG.
 4. Depois teste o convite:
-   - `https://convniver.netlify.app/c/theo-rhaian?v=4`
+   - `https://convidata.com.br/c/SEU-SLUG?v=4`
    O parâmetro é apenas para forçar uma nova tentativa de prévia enquanto o WhatsApp ainda pode ter cache da URL anterior.
 
 Se a rota `/og-image.jpg` abrir a imagem normalmente após o deploy, o HTML da página passará a apontar para essa imagem social otimizada.

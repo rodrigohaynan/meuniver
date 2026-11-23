@@ -15,7 +15,9 @@ import {
   UsersRound,
 } from "lucide-react";
 
-const REMEMBERED_EMAIL_KEY = "convniver.remembered-email";
+const REMEMBERED_EMAIL_KEY = "convidata.remembered-email";
+// Chave antiga (marca anterior), lida uma única vez para não perder o e-mail salvo.
+const LEGACY_REMEMBERED_EMAIL_KEY = "convniver.remembered-email";
 
 type IbgeCity = {
   id: number;
@@ -72,8 +74,14 @@ export function AuthCard() {
 
   useEffect(() => {
     try {
-      const rememberedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+      let rememberedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+      if (!rememberedEmail) {
+        rememberedEmail = window.localStorage.getItem(LEGACY_REMEMBERED_EMAIL_KEY);
+        if (rememberedEmail) window.localStorage.setItem(REMEMBERED_EMAIL_KEY, rememberedEmail);
+      }
+      window.localStorage.removeItem(LEGACY_REMEMBERED_EMAIL_KEY);
       if (rememberedEmail) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage só existe no navegador (após hidratar).
         setEmail(rememberedEmail);
         setRememberUser(true);
       }
@@ -84,6 +92,7 @@ export function AuthCard() {
 
   useEffect(() => {
     if (!stateUf) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpa a lista ao remover a UF antes de buscar outra.
       setCities([]);
       setCity("");
       return;

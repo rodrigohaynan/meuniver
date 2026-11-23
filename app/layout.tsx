@@ -4,19 +4,21 @@ import "./globals.css";
 const appName = "Convidata";
 const shareTitle = "Convidata — Convites digitais para momentos especiais";
 const shareDescription = "Crie convites digitais personalizados, acompanhe as confirmações de presença e organize sua lista de presentes em um só lugar.";
-const shareImage = "https://convidata.netlify.app/brand-preview.png?v=3";
+const siteUrl = "https://convidata.com.br";
+const shareImage = `${siteUrl}/brand-preview.png?v=3`;
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://convidata.netlify.app"),
+  metadataBase: new URL(siteUrl),
   title: shareTitle,
   description: shareDescription,
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "pt_BR",
     siteName: appName,
     title: shareTitle,
     description: shareDescription,
-    url: "https://convidata.netlify.app/",
+    url: `${siteUrl}/`,
     images: [{ url: shareImage, width: 1200, height: 630, type: "image/png", alt: "Convidata — convites digitais personalizados e lista de presentes" }],
   },
   twitter: { card: "summary_large_image", title: shareTitle, description: shareDescription, images: [shareImage] },

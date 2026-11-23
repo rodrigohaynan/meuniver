@@ -4,6 +4,8 @@ import { getSiteAdminUser } from "@/lib/site-admin";
 
 export const dynamic = "force-dynamic";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function clean(value: unknown, max = 160) {
   return String(value ?? "").trim().slice(0, max);
 }
@@ -13,6 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!adminUser) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
 
   const { id } = await context.params;
+  if (!UUID.test(id)) return NextResponse.json({ error: "Usuário inválido." }, { status: 400 });
   try {
     const body = await request.json().catch(() => ({}));
     const email = clean(body.email, 220).toLowerCase();
@@ -65,6 +68,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   if (!adminUser) return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
 
   const { id } = await context.params;
+  if (!UUID.test(id)) return NextResponse.json({ error: "Usuário inválido." }, { status: 400 });
   if (id === adminUser.id) {
     return NextResponse.json({ error: "A conta administrativa atual não pode ser excluída por esta tela." }, { status: 400 });
   }

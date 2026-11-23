@@ -18,14 +18,14 @@ export async function GET(request: Request) {
   const authorizationUrl = buildMercadoPagoAuthorizationUrl(state, challenge);
   const response = NextResponse.redirect(authorizationUrl);
 
-  response.cookies.set("convniver_mp_state", state, {
+  response.cookies.set("convidata_mp_state", state, {
     httpOnly: true,
     secure: new URL(request.url).protocol === "https:",
     sameSite: "lax",
     path: "/",
     maxAge: 10 * 60,
   });
-  response.cookies.set("convniver_mp_verifier", verifier, {
+  response.cookies.set("convidata_mp_verifier", verifier, {
     httpOnly: true,
     secure: new URL(request.url).protocol === "https:",
     sameSite: "lax",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   Check,
   ExternalLink,
@@ -116,7 +116,6 @@ export function InvitationEditor({
   const [giftImageBusy, setGiftImageBusy] = useState<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
-  const theme = getTheme(invitation.theme_key);
 
   async function saveInvitation(nextStatus: Invitation["status"] = invitation.status) {
     if (saving) return;
@@ -1450,7 +1449,7 @@ function MiniPreview({ invitation }: { invitation: Invitation }) {
 }
 
 function GiftImagePreview({ gift }: { gift: GiftItem }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
   const storedSuggestionImage = isStoredSuggestionImage(gift.suggestion_image_url)
     ? gift.suggestion_image_url
@@ -1459,10 +1458,8 @@ function GiftImagePreview({ gift }: { gift: GiftItem }) {
     ? suggestionImageProxyUrl(gift.id, gift.suggestion_url)
     : null;
   const src = gift.manual_image_url || storedSuggestionImage || proxyImage;
-
-  useEffect(() => {
-    setFailed(false);
-  }, [gift.id, gift.manual_image_url, gift.suggestion_image_url, gift.suggestion_url, src]);
+  // A falha vale só para a URL que falhou: ao trocar a imagem, tenta de novo.
+  const failed = Boolean(src) && failedSrc === src;
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-[#f6eee9]">
@@ -1472,7 +1469,7 @@ function GiftImagePreview({ gift }: { gift: GiftItem }) {
           src={src}
           alt={gift.name}
           className="h-40 w-full object-contain"
-          onError={() => setFailed(true)}
+          onError={() => setFailedSrc(src)}
         />
       ) : <div className="grid h-40 place-items-center text-3xl">🎁</div>}
       <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[#765f65]">

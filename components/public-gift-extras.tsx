@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, ExternalLink, Gift, Loader2, Ruler, Search, Sparkles, X } from "lucide-react";
+import { CheckCircle2, ExternalLink, Gift, Loader2, Ruler, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getTheme } from "@/lib/themes";
 import { DEFAULT_GIFT_INTRO_TEXT } from "@/lib/gift-copy";

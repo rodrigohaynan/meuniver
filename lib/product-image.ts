@@ -675,19 +675,6 @@ function mercadoLivreItemId(url: URL) {
   return "";
 }
 
-function mercadoLivreSlug(url: URL) {
-  const firstSegment = url.pathname.split("/").filter(Boolean)[0] ?? "";
-  if (!firstSegment || /^(?:MLB[-]?\d+|p|up)$/i.test(firstSegment)) return "";
-  return firstSegment
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 180);
-}
-
 function mercadoLivreCanonicalCandidate(url: URL) {
   const hostname = url.hostname.toLowerCase();
   if (!(hostname === "mercadolivre.com.br" || hostname.endsWith(".mercadolivre.com.br"))) return null;

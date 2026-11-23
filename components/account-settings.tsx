@@ -94,6 +94,7 @@ export function AccountSettings({ initialProfile }: { initialProfile: AccountPro
 
   useEffect(() => {
     if (!stateUf) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpa a lista ao remover a UF antes de buscar outra.
       setCities([]);
       return;
     }
