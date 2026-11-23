@@ -22,6 +22,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { InvitationBillingModal } from "@/components/invitation-billing-modal";
 import { getTheme, LAYOUTS, THEMES } from "@/lib/themes";
 import { DEFAULT_GIFT_INTRO_TEXT } from "@/lib/gift-copy";
 import { EVENT_TYPES, eventTypeFor, eventTypeMeta, eventUsesAge, defaultEventTitle, defaultInvitationText, type EventType } from "@/lib/event-types";
@@ -109,6 +110,9 @@ export function InvitationEditor({
   });
   const [tab, setTab] = useState<Tab>("content");
   const [saving, setSaving] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
+  const publishRequiresPayment =
+    invitation.status !== "published" && invitation.billing_status === "pending" && Number(invitation.billing_amount ?? 0) > 0;
   const [message, setMessage] = useState("");
   const [newGift, setNewGift] = useState({ name: "", description: "", price_hint: "", suggestion_url: "", reservation_mode: "single" as GiftReservationMode });
   const [giftBusy, setGiftBusy] = useState(false);
@@ -163,6 +167,11 @@ export function InvitationEditor({
         .maybeSingle();
 
       if (error) {
+        if (nextStatus === "published" && /aguarda pagamento/i.test(error.message)) {
+          setMessage("");
+          setShowBilling(true);
+          return;
+        }
         setMessage(
           nextStatus === "published"
             ? `Não foi possível publicar: ${error.message}`
@@ -188,6 +197,26 @@ export function InvitationEditor({
     } finally {
       setSaving(false);
     }
+  }
+
+  async function publishOrUnpublish() {
+    if (invitation.status === "published") {
+      await saveInvitation("draft");
+      return;
+    }
+    if (publishRequiresPayment) {
+      // Salva as alterações antes de cobrar: o organizador paga pelo convite que acabou de conferir.
+      await saveInvitation("draft");
+      setShowBilling(true);
+      return;
+    }
+    await saveInvitation("published");
+  }
+
+  function handleBillingPaid() {
+    setInvitation((current) => ({ ...current, billing_status: "paid" }));
+    setShowBilling(false);
+    void saveInvitation("published");
   }
 
   async function uploadHero(file: File | undefined) {
@@ -1411,9 +1440,17 @@ export function InvitationEditor({
 
           <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-[#eee3dc] pt-5">
             <button type="button" onClick={() => void saveInvitation()} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-full border border-[#d8c7bd] bg-white px-5 font-bold text-[#684f55] disabled:opacity-50">{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar alterações</button>
-            <button type="button" onClick={() => void saveInvitation(invitation.status === "published" ? "draft" : "published")} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="size-4 animate-spin" /> : null}{saving ? "Aguarde..." : invitation.status === "published" ? "Voltar para rascunho" : "Publicar convite agora"}</button>
+            <button type="button" onClick={() => void publishOrUnpublish()} disabled={saving} className="inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="size-4 animate-spin" /> : null}{saving ? "Aguarde..." : invitation.status === "published" ? "Voltar para rascunho" : publishRequiresPayment ? `Publicar convite (${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(invitation.billing_amount))})` : "Publicar convite agora"}</button>
             {message && <span className="text-sm font-bold text-[#7c686d]">{message}</span>}
           </div>
+          {showBilling && (
+            <InvitationBillingModal
+              invitationId={invitation.id}
+              amount={Number(invitation.billing_amount)}
+              onClose={() => setShowBilling(false)}
+              onPaid={handleBillingPaid}
+            />
+          )}
         </div>
       </section>
     </div>

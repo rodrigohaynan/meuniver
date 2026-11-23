@@ -122,6 +122,7 @@ export type SiteSettings = {
   invitation_price: number;
   free_invites_per_user: number;
   pix_platform_fee_percent: number;
+  pix_fee_paid_by: "guest" | "organizer";
   reminder_feature_enabled: boolean;
   currency: string;
 };

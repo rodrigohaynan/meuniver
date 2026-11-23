@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { PixFeeNote, usePixFeeConfig } from "@/components/pix-fee-note";
 import { getTheme } from "@/lib/themes";
 import { eventTypeFor, eventTypeMeta, eventUsesAge } from "@/lib/event-types";
 import type { GiftItem, Invitation, Rsvp } from "@/lib/types";
@@ -96,6 +97,7 @@ type PixGiftData = {
   paymentId: string;
   status: string;
   amount: number;
+  total?: number;
   platformFee: number;
   qrCode: string | null;
   qrCodeBase64: string | null;
@@ -158,6 +160,7 @@ export function PublicInvitation({
   const [pixBusy, setPixBusy] = useState(false);
   const [pixError, setPixError] = useState("");
   const [pixData, setPixData] = useState<PixGiftData | null>(null);
+  const pixFeeConfig = usePixFeeConfig(showPixGift);
   const [pixCopied, setPixCopied] = useState(false);
   const [pixApproved, setPixApproved] = useState(false);
 
@@ -727,7 +730,7 @@ export function PublicInvitation({
                 <label className="block text-sm font-bold">Valor do presente<input type="number" min="5" max="10000" step="0.01" value={pixAmount} onChange={(event) => setPixAmount(event.target.value)} required className="mt-2 h-11 w-full rounded-xl border border-[#d8c7bd] px-3 outline-none" /></label>
               </div>
 
-              <p className="mt-4 rounded-xl bg-[#faf6f3] px-4 py-3 text-xs leading-5 text-[#76666a]">A Convidata cobra 5% do valor do presente como taxa da plataforma. As tarifas do Mercado Pago são aplicadas conforme a conta do organizador.</p>
+              <PixFeeNote amount={Number(pixAmount)} config={pixFeeConfig} />
               {pixError && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{pixError}</p>}
               <button disabled={pixBusy} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white disabled:opacity-60">{pixBusy && <Loader2 className="size-4 animate-spin" />} Gerar PIX</button>
             </form>
@@ -735,13 +738,13 @@ export function PublicInvitation({
             <div className="text-center">
               <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 className="size-8" /></span>
               <h3 className="mt-4 font-display text-3xl font-bold">Presente recebido!</h3>
-              <p className="mt-2 text-sm leading-6 text-[#806e72]">Pagamento confirmado. O valor será dividido automaticamente entre o organizador e a Convidata pelo Mercado Pago.</p>
+              <p className="mt-2 text-sm leading-6 text-[#806e72]">Pagamento confirmado. O presente já está na conta Mercado Pago do organizador.</p>
               <button type="button" onClick={() => setShowPixGift(false)} className="mt-5 h-11 rounded-full bg-[#7d1f37] px-6 font-bold text-white">Concluir</button>
             </div>
           ) : (
             <div className="text-center">
               <h3 className="font-display text-2xl font-bold">Pague o PIX</h3>
-              <p className="mt-2 text-sm leading-6 text-[#806e72]">Presente de <strong>{formatCurrency(pixData.amount)}</strong>. A confirmação será atualizada automaticamente.</p>
+              <p className="mt-2 text-sm leading-6 text-[#806e72]">Presente de <strong>{formatCurrency(pixData.amount)}</strong>{pixData.total && pixData.total > pixData.amount ? <> • total do PIX <strong>{formatCurrency(pixData.total)}</strong> (inclui taxa de serviço)</> : null}. A confirmação será atualizada automaticamente.</p>
 
               {pixData.qrCodeBase64 && <img src={`data:image/png;base64,${pixData.qrCodeBase64}`} alt="QR Code PIX" className="mx-auto mt-5 size-64 max-w-full rounded-2xl border border-[#eaded7] bg-white p-3" />}
               {pixData.qrCode && (
