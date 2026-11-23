@@ -13,7 +13,8 @@ export async function PATCH(request: Request) {
     const invitationChargingEnabled = Boolean(body.invitationChargingEnabled);
     const invitationPrice = Number(body.invitationPrice ?? 0);
     const freeInvitesPerUser = Math.max(0, Math.round(Number(body.freeInvitesPerUser ?? 0)));
-    const pixPlatformFeePercent = Number(body.pixPlatformFeePercent ?? 5);
+    const pixPlatformFeePercent = Number(body.pixPlatformFeePercent ?? 0);
+    const pixFeePaidBy = body.pixFeePaidBy === "organizer" ? "organizer" : "guest";
     const reminderFeatureEnabled = Boolean(body.reminderFeatureEnabled);
 
     if (!Number.isFinite(invitationPrice) || invitationPrice < 0 || invitationPrice > 100000) {
@@ -30,6 +31,7 @@ export async function PATCH(request: Request) {
       invitation_price: invitationPrice,
       free_invites_per_user: freeInvitesPerUser,
       pix_platform_fee_percent: pixPlatformFeePercent,
+      pix_fee_paid_by: pixFeePaidBy,
       reminder_feature_enabled: reminderFeatureEnabled,
       updated_at: new Date().toISOString(),
       updated_by: adminUser.id,
@@ -46,6 +48,7 @@ export async function PATCH(request: Request) {
         invitation_price: invitationPrice,
         free_invites_per_user: freeInvitesPerUser,
         pix_platform_fee_percent: pixPlatformFeePercent,
+        pix_fee_paid_by: pixFeePaidBy,
         reminder_feature_enabled: reminderFeatureEnabled,
       },
     });

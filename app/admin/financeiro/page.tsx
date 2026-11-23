@@ -18,7 +18,8 @@ export default async function AdminFinancePage() {
     invitation_charging_enabled: Boolean(settingsData?.invitation_charging_enabled),
     invitation_price: Number(settingsData?.invitation_price ?? 0),
     free_invites_per_user: Number(settingsData?.free_invites_per_user ?? 0),
-    pix_platform_fee_percent: Number(settingsData?.pix_platform_fee_percent ?? 5),
+    pix_platform_fee_percent: Number(settingsData?.pix_platform_fee_percent ?? 0),
+    pix_fee_paid_by: settingsData?.pix_fee_paid_by === "organizer" ? "organizer" : "guest",
     reminder_feature_enabled: Boolean(settingsData?.reminder_feature_enabled),
   };
 

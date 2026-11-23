@@ -22,6 +22,8 @@ CONVIDATA — PASSO A PASSO PARA PUBLICAR
    MERCADO_PAGO_CLIENT_ID           (presentes em PIX)
    MERCADO_PAGO_CLIENT_SECRET       (presentes em PIX, marcar como secreta)
    OPENGRAPH_IO_APP_ID              (opcional: captura de imagens de anúncios)
+   MERCADO_PAGO_PLATFORM_ACCESS_TOKEN (somente ao ligar a cobrança da publicação;
+                                     access token da conta Mercado Pago da Convidata)
 
 4) AUTENTICAÇÃO
    Supabase > Authentication > Providers:

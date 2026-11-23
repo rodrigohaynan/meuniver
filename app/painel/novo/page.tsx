@@ -24,7 +24,7 @@ export default async function NewInvitationPage() {
   const existing = invitationCount ?? 0;
   const willCharge = enabled && !(freeLimit > 0 && existing < freeLimit);
   const billingNotice = willCharge
-    ? `Este novo convite terá cobrança de ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(price)}. Você poderá editá-lo normalmente, mas a publicação dependerá da liberação financeira.`
+    ? `A publicação deste convite custa ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(price)}, pagamento único. Você monta e confere tudo antes; o pagamento é feito por PIX só na hora de publicar.`
     : enabled && freeLimit > 0
       ? `Este convite está dentro da franquia gratuita de ${freeLimit} convite(s) da sua conta.`
       : "";

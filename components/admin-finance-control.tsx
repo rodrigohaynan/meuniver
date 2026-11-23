@@ -9,6 +9,7 @@ export type SiteSettingsForm = {
   invitation_price: number;
   free_invites_per_user: number;
   pix_platform_fee_percent: number;
+  pix_fee_paid_by: "guest" | "organizer";
   reminder_feature_enabled: boolean;
 };
 
@@ -37,6 +38,7 @@ export function AdminFinanceControl({ settings, invitations }: { settings: SiteS
       invitationPrice: Number(form.get("invitationPrice") || 0),
       freeInvitesPerUser: Number(form.get("freeInvitesPerUser") || 0),
       pixPlatformFeePercent: Number(form.get("pixPlatformFeePercent") || 0),
+      pixFeePaidBy: form.get("pixFeePaidBy") === "organizer" ? "organizer" : "guest",
       reminderFeatureEnabled: form.get("reminderFeatureEnabled") === "on",
     };
     const response = await fetch("/api/admin/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -71,7 +73,7 @@ export function AdminFinanceControl({ settings, invitations }: { settings: SiteS
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="flex items-start gap-3 rounded-2xl border border-[#e7dcd5] p-4">
             <input name="invitationChargingEnabled" type="checkbox" defaultChecked={settings.invitation_charging_enabled} className="mt-1 size-4 accent-[#7d1f37]" />
-            <span><strong className="block">Cobrar por novos convites</strong><span className="mt-1 block text-sm leading-5 text-[#806e72]">Quando ativo, novos convites pagos ficam pendentes até pagamento ou isenção.</span></span>
+            <span><strong className="block">Cobrar por novos convites</strong><span className="mt-1 block text-sm leading-5 text-[#806e72]">Quando ativo, novos convites só são publicados após o PIX do organizador (ou isenção). Convites criados antes continuam gratuitos.</span></span>
           </label>
           <label className="flex items-start gap-3 rounded-2xl border border-[#e7dcd5] p-4">
             <input name="reminderFeatureEnabled" type="checkbox" defaultChecked={settings.reminder_feature_enabled} className="mt-1 size-4 accent-[#7d1f37]" />
@@ -80,6 +82,7 @@ export function AdminFinanceControl({ settings, invitations }: { settings: SiteS
           <AdminField label="Preço por convite (R$)"><input name="invitationPrice" type="number" min="0" step="0.01" defaultValue={settings.invitation_price} className="input-admin" /></AdminField>
           <AdminField label="Convites gratuitos por usuário"><input name="freeInvitesPerUser" type="number" min="0" step="1" defaultValue={settings.free_invites_per_user} className="input-admin" /></AdminField>
           <AdminField label="Taxa da plataforma em presentes PIX (%)"><input name="pixPlatformFeePercent" type="number" min="0" max="100" step="0.01" defaultValue={settings.pix_platform_fee_percent} className="input-admin" /></AdminField>
+          <AdminField label="Quem paga a taxa do presente"><select name="pixFeePaidBy" defaultValue={settings.pix_fee_paid_by} className="input-admin"><option value="guest">Convidado (somada ao valor do PIX)</option><option value="organizer">Organizador (descontada do presente)</option></select></AdminField>
         </div>
         <button disabled={busy === "settings"} className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-[#7d1f37] px-5 font-bold text-white disabled:opacity-50">{busy === "settings" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Salvar configurações</button>
       </form>
