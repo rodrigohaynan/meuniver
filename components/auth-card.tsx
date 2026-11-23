@@ -81,6 +81,7 @@ export function AuthCard() {
       }
       window.localStorage.removeItem(LEGACY_REMEMBERED_EMAIL_KEY);
       if (rememberedEmail) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage só existe no navegador (após hidratar).
         setEmail(rememberedEmail);
         setRememberUser(true);
       }
@@ -91,6 +92,7 @@ export function AuthCard() {
 
   useEffect(() => {
     if (!stateUf) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpa a lista ao remover a UF antes de buscar outra.
       setCities([]);
       setCity("");
       return;

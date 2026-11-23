@@ -41,6 +41,7 @@ export function PaymentSettings() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carrega o status da conexão ao abrir a tela.
     void loadStatus();
   }, []);
 
