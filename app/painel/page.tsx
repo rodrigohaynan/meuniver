@@ -4,6 +4,7 @@ import { ArrowUpRight, CalendarDays, CircleDollarSign, Plus, Settings2 } from "l
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Invitation } from "@/lib/types";
 import { eventTypeFor, eventTypeMeta, eventUsesAge } from "@/lib/event-types";
+import { ShareInvitationButton } from "@/components/share-invitation-button";
 
 function formatAge(age: number | null, ageUnit: Invitation["age_unit"] = "years") {
   const value = Math.max(1, Math.round(Number(age) || 1));
@@ -92,9 +93,12 @@ export default async function DashboardPage() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href={`/painel/convites/${invitation.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#7d1f37] px-4 text-sm font-bold text-white"><Settings2 className="size-4" /> Editar</Link>
                   {invitation.status === "published" && (
-                    <Link href={`/c/${invitation.slug}`} target="_blank" className="inline-flex h-10 items-center gap-2 rounded-full border border-[#dac9bf] px-4 text-sm font-bold text-[#684f55]">
-                      Abrir <ArrowUpRight className="size-4" />
-                    </Link>
+                    <>
+                      <Link href={`/c/${invitation.slug}`} target="_blank" className="inline-flex h-10 items-center gap-2 rounded-full border border-[#dac9bf] px-4 text-sm font-bold text-[#684f55]">
+                        Abrir <ArrowUpRight className="size-4" />
+                      </Link>
+                      <ShareInvitationButton invitation={invitation} />
+                    </>
                   )}
                 </div>
               </div>

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InvitationBillingModal } from "@/components/invitation-billing-modal";
+import { ShareInvitationButton } from "@/components/share-invitation-button";
 import { getTheme, LAYOUTS, THEMES } from "@/lib/themes";
 import { DEFAULT_GIFT_INTRO_TEXT } from "@/lib/gift-copy";
 import { EVENT_TYPES, eventTypeFor, eventTypeMeta, eventUsesAge, defaultEventTitle, defaultInvitationText, type EventType } from "@/lib/event-types";
@@ -769,37 +770,6 @@ export function InvitationEditor({
     setMessage("Confirmação excluída.");
   }
 
-  function shareInvitationOnWhatsapp() {
-    const shareFingerprint = suggestionImageFingerprint([
-      invitation.event_title ?? "",
-      invitation.invitation_text ?? "",
-      invitation.hero_image_url ?? "",
-      invitation.hero_image_zoom ?? 1,
-      invitation.hero_image_x ?? 50,
-      invitation.hero_image_y ?? 50,
-      invitation.updated_at ?? "",
-    ].join("|"));
-
-    const invitationUrl = new URL(
-      `/c/${invitation.slug}`,
-      window.location.origin,
-    );
-    invitationUrl.searchParams.set("share", shareFingerprint);
-
-    const title = invitation.event_title?.trim() || "meu evento";
-    const text = [
-      "Você está convidado(a)! 🎉",
-      `Confira o convite de ${title} e confirme sua presença:`,
-      invitationUrl.toString(),
-    ].join("\n\n");
-
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(text)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-  }
-
   const adults = rsvps.reduce((sum, rsvp) => sum + rsvp.attendees.filter((item) => item.category === "adult").length, 0);
   const children = rsvps.reduce((sum, rsvp) => sum + rsvp.attendees.filter((item) => item.category === "child").length, 0);
   const totalGuests = adults + children;
@@ -821,7 +791,7 @@ export function InvitationEditor({
             <p className="text-xs font-bold uppercase tracking-[.14em] text-[#9a7438]">Prévia do convite</p>
             <p className="mt-1 text-sm font-semibold text-[#765f65]">Edite abaixo e acompanhe o resultado sem um painel pesado.</p>
           </div>
-          <div className="flex max-w-full flex-nowrap items-center gap-2 overflow-hidden">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
             <span className={`inline-flex h-8 shrink-0 items-center rounded-full px-3 text-xs font-bold ${invitation.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-[#f5ece7] text-[#765f65]"}`}>{invitation.status === "published" ? "Publicado" : "Rascunho"}</span>
             {invitation.status === "published" && (
               <>
@@ -833,20 +803,7 @@ export function InvitationEditor({
                 >
                   Abrir convite <ExternalLink className="size-3.5" />
                 </a>
-                <button
-                  type="button"
-                  onClick={shareInvitationOnWhatsapp}
-                  className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-50 px-3 tracking-normal text-emerald-700 transition hover:bg-emerald-100"
-                  style={{
-                    fontFamily: "Arial, Helvetica, sans-serif",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    lineHeight: "16px",
-                  }}
-                  aria-label="Compartilhar convite no WhatsApp"
-                >
-                  WhatsApp
-                </button>
+                <ShareInvitationButton invitation={invitation} size="sm" />
               </>
             )}
           </div>
